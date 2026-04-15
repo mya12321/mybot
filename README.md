@@ -797,7 +797,11 @@ pip install "nanobot-ai[weixin]"
   "channels": {
     "weixin": {
       "enabled": true,
-      "allowFrom": ["YOUR_WECHAT_USER_ID"]
+      "allowFrom": ["YOUR_WECHAT_USER_ID"],
+      "accounts": [
+        { "id": "personal" },
+        { "id": "work" }
+      ]
     }
   }
 }
@@ -808,6 +812,8 @@ pip install "nanobot-ai[weixin]"
 > - `routeTag`: Optional. When your upstream Weixin deployment requires request routing, nanobot will send it as the `SKRouteTag` header.
 > - `stateDir`: Optional. Defaults to nanobot's runtime directory for Weixin state.
 > - `pollTimeout`: Optional long-poll timeout in seconds.
+> - `accounts`: Optional. Configure multiple Weixin accounts (each with its own `id` and optional overrides like `stateDir`, `routeTag`, `allowFrom`, `token`).
+> - `accountId`: Optional for single-account mode. Defaults to `default`.
 
 **3. Login**
 
@@ -819,6 +825,13 @@ Use `--force` to re-authenticate and ignore any saved token:
 
 ```bash
 nanobot channels login weixin --force
+```
+
+If you configured multiple accounts, choose one with `--account`:
+
+```bash
+nanobot channels login weixin --account personal
+nanobot channels login weixin --account work --force
 ```
 
 **4. Run**

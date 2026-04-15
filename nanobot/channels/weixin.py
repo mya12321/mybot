@@ -122,6 +122,7 @@ class WeixinConfig(Base):
     route_tag: str | int | None = None
     token: str = ""  # Manually set token, or obtained via QR login
     state_dir: str = ""  # Default: ~/.nanobot/weixin/
+    account_id: str = "default"  # Logical account name for multi-account state isolation
     poll_timeout: int = DEFAULT_LONG_POLL_TIMEOUT_S  # seconds for long-poll
 
 
@@ -177,7 +178,7 @@ class WeixinChannel(BaseChannel):
 
     def _load_state(self) -> bool:
         """Load saved account state. Returns True if a valid token was found."""
-        state_file = self._get_state_dir() / "account.json"
+        state_file = self._get_state_file()
         if not state_file.exists():
             return False
         try:
@@ -210,7 +211,7 @@ class WeixinChannel(BaseChannel):
             return False
 
     def _save_state(self) -> None:
-        state_file = self._get_state_dir() / "account.json"
+        state_file = self._get_state_file()
         try:
             data = {
                 "token": self._token,
@@ -222,6 +223,15 @@ class WeixinChannel(BaseChannel):
             state_file.write_text(json.dumps(data, ensure_ascii=False))
         except Exception:
             pass
+
+    def _get_state_file(self) -> Path:
+        state_dir = self._get_state_dir()
+        account_id = str(self.config.account_id or "default").strip() or "default"
+        if account_id == "default":
+            # Keep the legacy path for backward compatibility.
+            return state_dir / "account.json"
+        safe_account_id = re.sub(r"[^a-zA-Z0-9._-]+", "_", account_id)
+        return state_dir / f"account_{safe_account_id}.json"
 
     # ------------------------------------------------------------------
     # HTTP helpers  (matches api.ts buildHeaders / apiFetch)
@@ -368,7 +378,8 @@ class WeixinChannel(BaseChannel):
                             self.config.base_url = base_url
                         self._save_state()
                         logger.info(
-                            "WeChat login successful! bot_id={} user_id={}",
+                            "WeChat login successful! account={} bot_id={} user_id={}",
+                            self.config.account_id,
                             bot_id,
                             user_id,
                         )
@@ -438,7 +449,7 @@ class WeixinChannel(BaseChannel):
         if force:
             self._token = ""
             self._get_updates_buf = ""
-            state_file = self._get_state_dir() / "account.json"
+            state_file = self._get_state_file()
             if state_file.exists():
                 state_file.unlink()
         if self._token or self._load_state():
@@ -474,7 +485,7 @@ class WeixinChannel(BaseChannel):
                 self._running = False
                 return
 
-        logger.info("WeChat channel starting with long-poll...")
+        logger.info("WeChat channel starting with long-poll... account={}", self.config.account_id)
 
         consecutive_failures = 0
         while self._running:

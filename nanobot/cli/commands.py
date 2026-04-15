@@ -1247,10 +1247,62 @@ def _get_bridge_dir() -> Path:
     return user_bridge
 
 
+def _resolve_weixin_login_config(channel_cfg: dict[str, Any], account: str | None) -> dict[str, Any]:
+    """Build effective weixin config for a single login target."""
+    cfg = dict(channel_cfg or {})
+    accounts = cfg.get("accounts")
+    base_cfg = {k: v for k, v in cfg.items() if k != "accounts"}
+
+    def _account_id(item: Any) -> str:
+        if isinstance(item, str):
+            return item.strip()
+        if isinstance(item, dict):
+            return str(
+                item.get("account_id")
+                or item.get("accountId")
+                or item.get("id")
+                or item.get("name")
+                or ""
+            ).strip()
+        return ""
+
+    if isinstance(accounts, list):
+        if account:
+            for item in accounts:
+                if _account_id(item) != account:
+                    continue
+                if isinstance(item, dict):
+                    resolved = dict(base_cfg)
+                    resolved.update(item)
+                    resolved["account_id"] = account
+                    return resolved
+                return {**base_cfg, "account_id": account}
+            return {**base_cfg, "account_id": account}
+
+        if len(accounts) == 1:
+            only = accounts[0]
+            only_id = _account_id(only)
+            if isinstance(only, dict):
+                resolved = dict(base_cfg)
+                resolved.update(only)
+                if only_id:
+                    resolved["account_id"] = only_id
+                return resolved
+            if only_id:
+                return {**base_cfg, "account_id": only_id}
+
+        return base_cfg
+
+    if account:
+        base_cfg["account_id"] = account
+    return base_cfg
+
+
 @channels_app.command("login")
 def channels_login(
     channel_name: str = typer.Argument(..., help="Channel name (e.g. weixin, whatsapp)"),
     force: bool = typer.Option(False, "--force", "-f", help="Force re-authentication even if already logged in"),
+    account: str | None = typer.Option(None, "--account", "-a", help="Logical account id (for multi-account channels like weixin)"),
     config_path: str | None = typer.Option(None, "--config", "-c", help="Path to config file"),
 ):
     """Authenticate with a channel via QR code or other interactive login."""
@@ -1272,6 +1324,16 @@ def channels_login(
         raise typer.Exit(1)
 
     console.print(f"{__logo__} {all_channels[channel_name].display_name} Login\n")
+
+    if channel_name == "weixin":
+        if isinstance(channel_cfg, dict):
+            accounts = channel_cfg.get("accounts")
+            if isinstance(accounts, list) and len(accounts) > 1 and not account:
+                console.print("[red]Weixin has multiple configured accounts; please pass --account.[/red]")
+                raise typer.Exit(1)
+            channel_cfg = _resolve_weixin_login_config(channel_cfg, account)
+        elif account:
+            channel_cfg = {"account_id": account}
 
     channel_cls = all_channels[channel_name]
     channel = channel_cls(channel_cfg, bus=None)

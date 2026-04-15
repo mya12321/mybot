@@ -79,6 +79,31 @@ def test_save_and_load_state_persists_context_tokens(tmp_path) -> None:
     assert restored._context_tokens == {"wx-user": "ctx-1"}
 
 
+def test_save_and_load_state_uses_account_specific_file_when_account_id_set(tmp_path) -> None:
+    bus = MessageBus()
+    channel = WeixinChannel(
+        WeixinConfig(enabled=True, allow_from=["*"], state_dir=str(tmp_path), account_id="work"),
+        bus,
+    )
+    channel._token = "token-work"
+    channel._context_tokens = {"wx-user": "ctx-work"}
+
+    channel._save_state()
+
+    assert not (tmp_path / "account.json").exists()
+    saved = json.loads((tmp_path / "account_work.json").read_text())
+    assert saved["token"] == "token-work"
+    assert saved["context_tokens"] == {"wx-user": "ctx-work"}
+
+    restored = WeixinChannel(
+        WeixinConfig(enabled=True, allow_from=["*"], state_dir=str(tmp_path), account_id="work"),
+        bus,
+    )
+    assert restored._load_state() is True
+    assert restored._token == "token-work"
+    assert restored._context_tokens == {"wx-user": "ctx-work"}
+
+
 @pytest.mark.asyncio
 async def test_process_message_deduplicates_inbound_ids() -> None:
     channel, bus = _make_channel()

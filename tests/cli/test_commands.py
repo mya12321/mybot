@@ -1334,3 +1334,68 @@ def test_channels_login_requires_channel_name() -> None:
     result = runner.invoke(app, ["channels", "login"])
 
     assert result.exit_code == 2
+
+
+def test_channels_login_weixin_multi_accounts_requires_account(monkeypatch) -> None:
+    class _DummyWeixin:
+        display_name = "WeChat"
+
+        def __init__(self, _cfg, bus=None):
+            self._cfg = _cfg
+
+        async def login(self, force: bool = False) -> bool:
+            return True
+
+    config = Config.model_validate(
+        {
+            "channels": {
+                "weixin": {
+                    "enabled": True,
+                    "accounts": [{"id": "personal"}, {"id": "work"}],
+                }
+            }
+        }
+    )
+    monkeypatch.setattr("nanobot.config.loader.load_config", lambda _path=None: config)
+    monkeypatch.setattr("nanobot.channels.registry.discover_all", lambda: {"weixin": _DummyWeixin})
+
+    result = runner.invoke(app, ["channels", "login", "weixin"])
+
+    assert result.exit_code == 1
+    assert "please pass --account" in result.stdout
+
+
+def test_channels_login_weixin_resolves_selected_account_config(monkeypatch) -> None:
+    class _DummyWeixin:
+        display_name = "WeChat"
+        last_cfg: dict[str, object] | None = None
+
+        def __init__(self, cfg, bus=None):
+            _DummyWeixin.last_cfg = cfg
+
+        async def login(self, force: bool = False) -> bool:
+            return True
+
+    config = Config.model_validate(
+        {
+            "channels": {
+                "weixin": {
+                    "enabled": True,
+                    "allowFrom": ["*"],
+                    "accounts": [
+                        {"id": "personal"},
+                        {"id": "work", "routeTag": "work-rt"},
+                    ],
+                }
+            }
+        }
+    )
+    monkeypatch.setattr("nanobot.config.loader.load_config", lambda _path=None: config)
+    monkeypatch.setattr("nanobot.channels.registry.discover_all", lambda: {"weixin": _DummyWeixin})
+
+    result = runner.invoke(app, ["channels", "login", "weixin", "--account", "work"])
+
+    assert result.exit_code == 0
+    assert _DummyWeixin.last_cfg is not None
+    assert _DummyWeixin.last_cfg["account_id"] == "work"
+    assert _DummyWeixin.last_cfg["routeTag"] == "work-rt"

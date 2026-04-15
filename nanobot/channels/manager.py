@@ -46,23 +46,67 @@ class ChannelManager:
             section = getattr(self.config.channels, name, None)
             if section is None:
                 continue
-            enabled = (
-                section.get("enabled", False)
-                if isinstance(section, dict)
-                else getattr(section, "enabled", False)
-            )
-            if not enabled:
-                continue
-            try:
-                channel = cls(section, self.bus)
-                channel.transcription_provider = transcription_provider
-                channel.transcription_api_key = transcription_key
-                self.channels[name] = channel
-                logger.info("{} channel enabled", cls.display_name)
-            except Exception as e:
-                logger.warning("{} channel not available: {}", name, e)
+            for channel_name, channel_cfg in self._expand_channel_instances(name, section):
+                enabled = (
+                    channel_cfg.get("enabled", False)
+                    if isinstance(channel_cfg, dict)
+                    else getattr(channel_cfg, "enabled", False)
+                )
+                if not enabled:
+                    continue
+                if channel_name in self.channels:
+                    logger.warning("Duplicate channel instance name skipped: {}", channel_name)
+                    continue
+                try:
+                    channel = cls(channel_cfg, self.bus)
+                    # Allow one channel type (e.g. weixin) to expose multiple logical instances.
+                    channel.name = channel_name
+                    channel.transcription_provider = transcription_provider
+                    channel.transcription_api_key = transcription_key
+                    self.channels[channel_name] = channel
+                    logger.info("{} channel enabled as {}", cls.display_name, channel_name)
+                except Exception as e:
+                    logger.warning("{} channel not available: {}", channel_name, e)
 
         self._validate_allow_from()
+
+    def _expand_channel_instances(self, name: str, section: Any) -> list[tuple[str, Any]]:
+        """Expand a single channel config into one or more logical channel instances."""
+        if name != "weixin" or not isinstance(section, dict):
+            return [(name, section)]
+
+        accounts = section.get("accounts")
+        if not isinstance(accounts, list) or not accounts:
+            return [(name, section)]
+
+        base_cfg = {k: v for k, v in section.items() if k != "accounts"}
+        expanded: list[tuple[str, Any]] = []
+        for idx, account in enumerate(accounts):
+            if isinstance(account, str):
+                account_cfg: dict[str, Any] = {"account_id": account}
+            elif isinstance(account, dict):
+                account_cfg = dict(account)
+            else:
+                logger.warning("Invalid weixin account entry at index {}: {}", idx, account)
+                continue
+
+            account_id = str(
+                account_cfg.get("account_id")
+                or account_cfg.get("accountId")
+                or account_cfg.get("id")
+                or account_cfg.get("name")
+                or ""
+            ).strip()
+            if not account_id:
+                logger.warning("Skip weixin account without id at index {}", idx)
+                continue
+
+            merged_cfg = dict(base_cfg)
+            merged_cfg.update(account_cfg)
+            merged_cfg["account_id"] = account_id
+            expanded.append((f"{name}.{account_id}", merged_cfg))
+
+        return expanded or [(name, section)]
 
     def _resolve_transcription_key(self, provider: str) -> str:
         """Pick the API key for the configured transcription provider."""

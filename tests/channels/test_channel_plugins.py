@@ -799,6 +799,27 @@ async def test_enabled_channels_returns_channel_names():
     assert len(enabled) == 2
 
 
+def test_expand_weixin_channel_instances_from_accounts_config():
+    mgr = ChannelManager.__new__(ChannelManager)
+    section = {
+        "enabled": True,
+        "allowFrom": ["*"],
+        "accounts": [
+            {"id": "personal"},
+            {"accountId": "work", "routeTag": "rt-work"},
+        ],
+    }
+
+    expanded = mgr._expand_channel_instances("weixin", section)
+
+    assert len(expanded) == 2
+    names = [name for name, _cfg in expanded]
+    assert names == ["weixin.personal", "weixin.work"]
+    assert expanded[0][1]["account_id"] == "personal"
+    assert expanded[1][1]["account_id"] == "work"
+    assert expanded[1][1]["routeTag"] == "rt-work"
+
+
 @pytest.mark.asyncio
 async def test_stop_all_cancels_dispatcher_and_stops_channels():
     """stop_all should cancel the dispatch task and stop all channels."""

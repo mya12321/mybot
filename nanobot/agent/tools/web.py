@@ -7,6 +7,9 @@ import html
 import json
 import os
 import re
+import trafilatura
+from random import randint
+from scrapling.fetchers import AsyncStealthySession
 from typing import TYPE_CHECKING, Any
 from urllib.parse import quote, urlparse
 
@@ -174,10 +177,12 @@ class WebSearchTool(Tool):
             logger.warning("TAVILY_API_KEY not set, falling back to DuckDuckGo")
             return await self._search_duckduckgo(query, n)
         try:
+            key_list = api_key.split(",")
+            key = key_list[randint(0, len(key_list) - 1)]
             async with httpx.AsyncClient(proxy=self.proxy) as client:
                 r = await client.post(
                     "https://api.tavily.com/search",
-                    headers={"Authorization": f"Bearer {api_key}"},
+                    headers={"Authorization": f"Bearer {key}"},
                     json={"query": query, "max_results": n},
                     timeout=15.0,
                 )
@@ -284,7 +289,7 @@ class WebSearchTool(Tool):
         url=StringSchema("URL to fetch"),
         extractMode={
             "type": "string",
-            "enum": ["markdown", "text"],
+            "enum": ["markdown", "txt"],
             "default": "markdown",
         },
         maxChars=IntegerSchema(0, minimum=100),
@@ -345,7 +350,7 @@ class WebFetchTool(Tool):
             jina_key = os.environ.get("JINA_API_KEY", "")
             if jina_key:
                 headers["Authorization"] = f"Bearer {jina_key}"
-            async with httpx.AsyncClient(proxy=self.proxy, timeout=20.0) as client:
+            async with httpx.AsyncClient(proxy=self.proxy, timeout=10.0) as client:
                 r = await client.get(f"https://r.jina.ai/{url}", headers=headers)
                 if r.status_code == 429:
                     logger.debug("Jina Reader rate limited, falling back to readability")
@@ -375,37 +380,59 @@ class WebFetchTool(Tool):
             return None
 
     async def _fetch_readability(self, url: str, extract_mode: str, max_chars: int) -> Any:
-        """Local fallback using readability-lxml."""
-        from readability import Document
+        """Local fallback using scrapling."""
 
         try:
             async with httpx.AsyncClient(
                 follow_redirects=True,
                 max_redirects=MAX_REDIRECTS,
-                timeout=30.0,
+                timeout=10.0,
                 proxy=self.proxy,
             ) as client:
-                r = await client.get(url, headers={"User-Agent": USER_AGENT})
+                r = await client.head(url, headers={"User-Agent": USER_AGENT})
                 r.raise_for_status()
 
-            from nanobot.security.network import validate_resolved_url
-            redir_ok, redir_err = validate_resolved_url(str(r.url))
-            if not redir_ok:
-                return json.dumps({"error": f"Redirect blocked: {redir_err}", "url": url}, ensure_ascii=False)
-
             ctype = r.headers.get("content-type", "")
-            if ctype.startswith("image/"):
-                return build_image_content_blocks(r.content, ctype, url, f"(Image fetched from: {url})")
+            if "text/html" in ctype:
+                async with AsyncStealthySession(
+                    headless=True,
+                    block_webrtc=True,
+                    hide_canvas=True,
+                    disable_resources=True,
+                ) as session:
+                    page = await session.context.new_page()
+                    await page.goto(url, wait_until="domcontentloaded", referer="https://www.google.com/search?q=test")
+                    done, pending = await asyncio.wait(
+                        [
+                            asyncio.create_task(page.wait_for_load_state("networkidle")),
+                            asyncio.create_task(asyncio.sleep(10)),
+                        ],
+                        return_when=asyncio.FIRST_COMPLETED,
+                    )
 
-            if "application/json" in ctype:
-                text, extractor = json.dumps(r.json(), indent=2, ensure_ascii=False), "json"
-            elif "text/html" in ctype or r.text[:256].lower().startswith(("<!doctype", "<html")):
-                doc = Document(r.text)
-                content = self._to_markdown(doc.summary()) if extract_mode == "markdown" else _strip_tags(doc.summary())
-                text = f"# {doc.title()}\n\n{content}" if doc.title() else content
-                extractor = "readability"
+                    html = await page.content()
+                    pending_task = pending.pop()
+                    pending_task.cancel()
+                    text = trafilatura.extract(
+                        html, output_format=extract_mode, include_links=False, include_tables=True
+                    )
+                extractor = "trafilatura"
             else:
-                text, extractor = r.text, "raw"
+                async with httpx.AsyncClient(
+                    follow_redirects=True,
+                    max_redirects=MAX_REDIRECTS,
+                    timeout=10.0,
+                    proxy=self.proxy,
+                ) as client:
+                    r = await client.get(url, headers={"User-Agent": USER_AGENT})
+                    r.raise_for_status()
+                if ctype.startswith("image/"):
+                    return build_image_content_blocks(r.content, ctype, url, f"(Image fetched from: {url})")
+
+                if "application/json" in ctype:
+                    text, extractor = json.dumps(r.json(), indent=2, ensure_ascii=False), "json"
+                else:
+                    text, extractor = r.text, "raw"
 
             truncated = len(text) > max_chars
             if truncated:

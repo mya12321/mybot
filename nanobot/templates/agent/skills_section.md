@@ -8,6 +8,6 @@ You have access to skills that provide optimized workflows for specific tasks. E
 4. Load referenced resources only when needed during execution
 5. Follow the skill's instructions precisely
 
-{skills_summary}
+{{ skills_summary }}
 
 </skill_system>

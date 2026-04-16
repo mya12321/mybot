@@ -108,6 +108,26 @@ class TestBwrapBackend:
         try_pairs = {(tokens[i + 1], tokens[i + 2]) for i in try_indices}
         assert (str(fake_media), str(fake_media)) in try_pairs
 
+    def test_allowed_env_keys_from_config_added_as_setenv(self, tmp_path, monkeypatch):
+        """allowedEnvKeys in config.json should be translated to bwrap --setenv."""
+        ws = tmp_path / "project"
+        ws.mkdir(parents=True)
+        config_path = ws.parent / "config.json"
+        config_path.write_text(
+            '{"tools":{"exec":{"allowedEnvKeys":["MY_CUSTOM_VAR","MISSING_VAR"]}}}',
+            encoding="utf-8",
+        )
+        monkeypatch.setenv("MY_CUSTOM_VAR", "value-from-env")
+        monkeypatch.delenv("MISSING_VAR", raising=False)
+
+        result = wrap_command("bwrap", "env", str(ws), str(ws))
+        tokens = _parse(result)
+
+        setenv_indices = [i for i, t in enumerate(tokens) if t == "--setenv"]
+        setenv_pairs = {(tokens[i + 1], tokens[i + 2]) for i in setenv_indices}
+        assert ("MY_CUSTOM_VAR", "value-from-env") in setenv_pairs
+        assert all(name != "MISSING_VAR" for name, _ in setenv_pairs)
+
 
 class TestUnknownBackend:
     def test_raises_value_error(self, tmp_path):

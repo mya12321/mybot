@@ -1,6 +1,6 @@
 ---
 name: memory
-description: Two-layer memory system with Dream-managed knowledge files.
+description: Two-layer memory system with Dream-managed knowledge files. Use when users ask to remember facts/preferences, retrieve past context, or search historical memory entries.
 always: true
 ---
 

@@ -68,8 +68,8 @@ def _bwrap(command: str, workspace: str, cwd: str) -> str:
         "/etc/ssl/certs",
         "/etc/resolv.conf",
         "/etc/ld.so.cache",
-        "~/.nvm",
-        "~/.local",
+        "/root/.nvm",
+        "/root/.local",
     ]
 
     args = ["bwrap", "--new-session", "--die-with-parent", "--share-net", "--clearenv"]

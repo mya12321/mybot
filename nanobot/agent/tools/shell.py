@@ -141,7 +141,6 @@ class ExecTool(Tool):
                 command = f'export PATH="$PATH:{self.path_append}"; {command}'
 
         try:
-            logger.debug("Spawning command: {command}", command=command)
             process = await self._spawn(command, cwd, env)
 
             try:

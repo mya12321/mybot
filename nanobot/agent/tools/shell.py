@@ -150,6 +150,7 @@ class ExecTool(Tool):
                 )
             except asyncio.TimeoutError:
                 await self._kill_process(process)
+                logger.error("Command timed out after {effective_timeout} seconds: {command}", effective_timeout=effective_timeout, command=command)
                 return f"Error: Command timed out after {effective_timeout} seconds"
             except asyncio.CancelledError:
                 await self._kill_process(process)
@@ -178,9 +179,11 @@ class ExecTool(Tool):
                     + result[-half:]
                 )
 
+            logger.debug("Command output: {}", result)
             return result
 
         except Exception as e:
+            logger.error("Error executing command: {error}", error=str(e))
             return f"Error executing command: {str(e)}"
 
     @staticmethod

@@ -3,6 +3,7 @@
 import base64
 import mimetypes
 import platform
+from loguru import logger
 from pathlib import Path
 from typing import Any
 
@@ -42,12 +43,6 @@ class ContextBuilder:
         if memory:
             parts.append(f"# Memory\n\n{memory}")
 
-        always_skills = self.skills.get_always_skills()
-        if always_skills:
-            always_content = self.skills.load_skills_for_context(always_skills)
-            if always_content:
-                parts.append(f"# Active Skills\n\n{always_content}")
-
         skills_summary = self.skills.build_skills_summary()
         if skills_summary:
             parts.append(render_template("agent/skills_section.md", skills_summary=skills_summary))
@@ -59,6 +54,7 @@ class ContextBuilder:
                 f"- [{e['timestamp']}] {e['content']}" for e in capped
             ))
 
+        logger.debug("System prompt: {}", "\n\n---\n\n".join(parts))
         return "\n\n---\n\n".join(parts)
 
     def _get_identity(self, channel: str | None = None) -> str:

@@ -3,7 +3,6 @@
 import base64
 import mimetypes
 import platform
-from loguru import logger
 from pathlib import Path
 from typing import Any
 
@@ -54,7 +53,6 @@ class ContextBuilder:
                 f"- [{e['timestamp']}] {e['content']}" for e in capped
             ))
 
-        logger.debug("System prompt: {}", "\n\n---\n\n".join(parts))
         return "\n\n---\n\n".join(parts)
 
     def _get_identity(self, channel: str | None = None) -> str:

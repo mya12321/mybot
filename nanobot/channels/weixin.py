@@ -1151,6 +1151,7 @@ class WeixinChannel(BaseChannel):
             "base_info": BASE_INFO,
         }
 
+        logger.debug(f"WeChat outbound text: {text}")
         data = await self._api_post("ilink/bot/sendmessage", body)
         errcode = data.get("errcode", 0)
         if errcode and errcode != 0:

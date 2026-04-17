@@ -442,6 +442,7 @@ def build_status_content(
 def sync_workspace_templates(workspace: Path, silent: bool = False) -> list[str]:
     """Sync bundled templates to workspace. Only creates missing files."""
     from importlib.resources import files as pkg_files
+    workspace.mkdir(parents=True, exist_ok=True)
     try:
         tpl = pkg_files("nanobot") / "templates"
     except Exception:

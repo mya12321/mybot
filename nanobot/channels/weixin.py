@@ -56,6 +56,12 @@ WEIXIN_MAX_MESSAGE_LEN = 4000
 WEIXIN_CHANNEL_VERSION = "2.1.1"
 ILINK_APP_ID = "bot"
 
+# Outbound rate-limit mitigation: after the first queued text message, wait up
+# to this many seconds for additional text messages to arrive, then send them
+# as a single message separated by newlines. Progress / streaming / media
+# messages bypass this buffer.
+WEIXIN_MERGE_WINDOW_S = 5.0
+
 
 def _build_client_version(version: str) -> int:
     """Encode semantic version as 0x00MMNNPP (major/minor/patch in one uint32)."""
@@ -160,6 +166,11 @@ class WeixinChannel(BaseChannel):
         self._session_pause_until: float = 0.0
         self._typing_tasks: dict[str, asyncio.Task] = {}
         self._typing_tickets: dict[str, dict[str, Any]] = {}
+
+        # Outbound text-merge buffers (per chat_id).
+        self._text_buffers: dict[str, list[str]] = {}
+        self._text_flush_tasks: dict[str, asyncio.Task] = {}
+        self._text_buffer_lock = asyncio.Lock()
 
     # ------------------------------------------------------------------
     # State persistence
@@ -511,6 +522,17 @@ class WeixinChannel(BaseChannel):
             self._poll_task.cancel()
         for chat_id in list(self._typing_tasks):
             await self._stop_typing(chat_id, clear_remote=False)
+        # Flush any text still sitting in the merge buffer so messages aren't
+        # lost on shutdown.
+        for chat_id in list(self._text_buffers.keys()):
+            try:
+                await self._flush_text_buffer(chat_id)
+            except Exception as e:
+                logger.debug("WeChat flush-on-stop failed for {}: {}", chat_id, e)
+        for task in list(self._text_flush_tasks.values()):
+            if not task.done():
+                task.cancel()
+        self._text_flush_tasks.clear()
         if self._client:
             await self._client.aclose()
             self._client = None
@@ -960,6 +982,87 @@ class WeixinChannel(BaseChannel):
             return
 
         is_progress = bool((msg.metadata or {}).get("_progress", False))
+
+        # Progress / tool-hint messages bypass the merge buffer — they are
+        # small status updates that lose value if delayed.
+        if is_progress:
+            await self._send_now(msg)
+            return
+
+        # Messages carrying media bypass the buffer, but we must first flush
+        # any pending buffered text so that ordering is preserved.
+        if msg.media:
+            await self._flush_text_buffer(msg.chat_id)
+            await self._send_now(msg)
+            return
+
+        content = (msg.content or "").strip()
+        if not content:
+            return
+
+        await self._enqueue_text_for_merge(msg.chat_id, content)
+
+    async def _enqueue_text_for_merge(self, chat_id: str, text: str) -> None:
+        """Append text to the per-chat merge buffer and ensure a flush is scheduled."""
+        async with self._text_buffer_lock:
+            self._text_buffers.setdefault(chat_id, []).append(text)
+            task = self._text_flush_tasks.get(chat_id)
+            if task is None or task.done():
+                self._text_flush_tasks[chat_id] = asyncio.create_task(
+                    self._delayed_flush(chat_id)
+                )
+
+    async def _delayed_flush(self, chat_id: str) -> None:
+        """Sleep for the merge window, then flush the buffer."""
+        try:
+            await asyncio.sleep(WEIXIN_MERGE_WINDOW_S)
+        except asyncio.CancelledError:
+            return
+        try:
+            await self._flush_text_buffer(chat_id)
+        except Exception as e:
+            logger.error("WeChat delayed flush failed for {}: {}", chat_id, e)
+
+    async def _flush_text_buffer(self, chat_id: str) -> None:
+        """Merge and send any buffered text for a chat_id, cancelling the timer."""
+        async with self._text_buffer_lock:
+            parts = self._text_buffers.pop(chat_id, [])
+            task = self._text_flush_tasks.pop(chat_id, None)
+
+        if task is not None and not task.done() and task is not asyncio.current_task():
+            task.cancel()
+
+        if not parts:
+            return
+
+        merged = "\n".join(parts)
+        if len(parts) > 1:
+            logger.info(
+                "WeChat merged {} outbound messages to {} ({} chars)",
+                len(parts),
+                chat_id,
+                len(merged),
+            )
+        merged_msg = OutboundMessage(
+            channel=self.name,
+            chat_id=chat_id,
+            content=merged,
+        )
+        try:
+            await self._send_now(merged_msg)
+        except Exception as e:
+            logger.error("WeChat merged text send failed for {}: {}", chat_id, e)
+
+    async def _send_now(self, msg: OutboundMessage) -> None:
+        """Actually send an outbound message, bypassing the merge buffer."""
+        if not self._client or not self._token:
+            return
+        try:
+            self._assert_session_active()
+        except RuntimeError:
+            return
+
+        is_progress = bool((msg.metadata or {}).get("_progress", False))
         if not is_progress:
             await self._stop_typing(msg.chat_id, clear_remote=True)
 
@@ -1151,7 +1254,6 @@ class WeixinChannel(BaseChannel):
             "base_info": BASE_INFO,
         }
 
-        logger.debug(f"WeChat outbound text: {text}")
         data = await self._api_post("ilink/bot/sendmessage", body)
         errcode = data.get("errcode", 0)
         if errcode and errcode != 0:

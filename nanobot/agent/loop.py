@@ -524,7 +524,6 @@ class AgentLoop:
                             meta = dict(msg.metadata or {})
                             meta["_stream_delta"] = True
                             meta["_stream_id"] = _current_stream_id()
-                            logger.debug(f"Publishing stream delta: {delta}")
                             await self.bus.publish_outbound(OutboundMessage(
                                 channel=msg.channel, chat_id=msg.chat_id,
                                 content=delta,
@@ -703,7 +702,6 @@ class AgentLoop:
             meta = dict(msg.metadata or {})
             meta["_progress"] = True
             meta["_tool_hint"] = tool_hint
-            logger.debug(f"Publishing progress: {content}")
             await self.bus.publish_outbound(
                 OutboundMessage(
                     channel=msg.channel,

@@ -524,6 +524,7 @@ class AgentLoop:
                             meta = dict(msg.metadata or {})
                             meta["_stream_delta"] = True
                             meta["_stream_id"] = _current_stream_id()
+                            logger.debug(f"Publishing stream delta: {delta}")
                             await self.bus.publish_outbound(OutboundMessage(
                                 channel=msg.channel, chat_id=msg.chat_id,
                                 content=delta,
@@ -702,6 +703,7 @@ class AgentLoop:
             meta = dict(msg.metadata or {})
             meta["_progress"] = True
             meta["_tool_hint"] = tool_hint
+            logger.debug(f"Publishing progress: {content}")
             await self.bus.publish_outbound(
                 OutboundMessage(
                     channel=msg.channel,
@@ -763,14 +765,12 @@ class AgentLoop:
         meta = dict(msg.metadata or {})
         if on_stream is not None and stop_reason != "error":
             meta["_streamed"] = True
-        final_message = OutboundMessage(
+        return OutboundMessage(
             channel=msg.channel,
             chat_id=msg.chat_id,
             content=final_content,
             metadata=meta,
         )
-        await self.bus.publish_outbound(final_message)
-        return final_message
 
     def _sanitize_persisted_blocks(
         self,

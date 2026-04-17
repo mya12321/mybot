@@ -763,12 +763,14 @@ class AgentLoop:
         meta = dict(msg.metadata or {})
         if on_stream is not None and stop_reason != "error":
             meta["_streamed"] = True
-        return OutboundMessage(
+        final_message = OutboundMessage(
             channel=msg.channel,
             chat_id=msg.chat_id,
             content=final_content,
             metadata=meta,
         )
+        await self.bus.publish_outbound(final_message)
+        return final_message
 
     def _sanitize_persisted_blocks(
         self,

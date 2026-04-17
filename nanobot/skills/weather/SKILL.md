@@ -18,12 +18,12 @@ metadata: {"nanobot":{"emoji":"🌤️","requires":{"bins":["curl"],"env":["QWEA
 
 ## 和风天气 / QWeather（主要）
 
-免费订阅使用 `devapi.qweather.com`。
+host使用 `mr65npbeke.re.qweatherapi.com`。
 
 ### 1. 城市查询（获取 Location ID）
 
 ```bash
-curl -s "https://geoapi.qweather.com/v2/city/lookup?location=beijing&key=$QWEATHER_API_KEY" | jq .
+curl -s --compressed "https://mr65npbeke.re.qweatherapi.com/geo/v2/city/lookup?location=beijing&key=$QWEATHER_API_KEY" | jq .
 ```
 
 返回 `location[].id` 即 Location ID（如 `101010100` 为北京），后续接口均使用此 ID。
@@ -33,7 +33,7 @@ curl -s "https://geoapi.qweather.com/v2/city/lookup?location=beijing&key=$QWEATH
 ### 2. 实时天气
 
 ```bash
-curl -s "https://devapi.qweather.com/v7/weather/now?location=101010100&key=$QWEATHER_API_KEY" | jq .
+curl -s --compressed "https://mr65npbeke.re.qweatherapi.com/v7/weather/now?location=101010100&key=$QWEATHER_API_KEY" | jq .
 ```
 
 返回字段：`now.temp`（温度°C）· `now.feelsLike`（体感温度）· `now.text`（天气描述）· `now.windDir`（风向）· `now.windScale`（风力等级）· `now.humidity`（湿度%）· `now.precip`（降水量mm）
@@ -41,11 +41,11 @@ curl -s "https://devapi.qweather.com/v7/weather/now?location=101010100&key=$QWEA
 ### 3. 天气预报
 
 ```bash
-# 3天预报（免费版）
-curl -s "https://devapi.qweather.com/v7/weather/3d?location=101010100&key=$QWEATHER_API_KEY" | jq .
+# 3天预报
+curl -s --compressed "https://mr65npbeke.re.qweatherapi.com/v7/weather/3d?location=101010100&key=$QWEATHER_API_KEY" | jq .
 
-# 7天预报（付费版）
-curl -s "https://devapi.qweather.com/v7/weather/7d?location=101010100&key=$QWEATHER_API_KEY" | jq .
+# 7天预报
+curl -s --compressed "https://mr65npbeke.re.qweatherapi.com/v7/weather/7d?location=101010100&key=$QWEATHER_API_KEY" | jq .
 ```
 
 返回 `daily[]`：`fxDate`（日期）· `tempMax/tempMin`（最高/最低温）· `textDay/textNight`（白天/夜间天气）· `windDirDay`（风向）· `humidity`（湿度）
@@ -54,16 +54,16 @@ curl -s "https://devapi.qweather.com/v7/weather/7d?location=101010100&key=$QWEAT
 
 ```bash
 # 逐小时预报（24h）
-curl -s "https://devapi.qweather.com/v7/weather/24h?location=101010100&key=$QWEATHER_API_KEY" | jq .
+curl -s --compressed "https://mr65npbeke.re.qweatherapi.com/v7/weather/24h?location=101010100&key=$QWEATHER_API_KEY" | jq .
 
 # 天气预警
-curl -s "https://devapi.qweather.com/v7/warning/now?location=101010100&key=$QWEATHER_API_KEY" | jq .
+curl -s --compressed "https://mr65npbeke.re.qweatherapi.com/v7/warning/now?location=101010100&key=$QWEATHER_API_KEY" | jq .
 
 # 空气质量
-curl -s "https://devapi.qweather.com/v7/air/now?location=101010100&key=$QWEATHER_API_KEY" | jq .
+curl -s --compressed "https://mr65npbeke.re.qweatherapi.com/v7/air/now?location=101010100&key=$QWEATHER_API_KEY" | jq .
 
 # 生活指数（免费版支持当天）
-curl -s "https://devapi.qweather.com/v7/indices/1d?type=0&location=101010100&key=$QWEATHER_API_KEY" | jq .
+curl -s --compressed "https://mr65npbeke.re.qweatherapi.com/v7/indices/1d?type=0&location=101010100&key=$QWEATHER_API_KEY" | jq .
 ```
 
 ### 注意事项
@@ -82,7 +82,7 @@ curl -s "https://devapi.qweather.com/v7/indices/1d?type=0&location=101010100&key
 curl -s "https://api.seniverse.com/v3/weather/now.json?key=$SENIVERSE_API_KEY&location=beijing&language=zh-Hans&unit=c" | jq .
 ```
 
-返回：`results[].now.text`（天气描述）· `now.temperature`（温度）
+返回：`results[].now.text`（天气描述）· `results[].now.temperature`（温度）
 
 ### 2. 未来3天预报
 

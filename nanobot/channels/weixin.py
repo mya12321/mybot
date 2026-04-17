@@ -60,7 +60,7 @@ ILINK_APP_ID = "bot"
 # to this many seconds for additional text messages to arrive, then send them
 # as a single message separated by newlines. Progress / streaming / media
 # messages bypass this buffer.
-WEIXIN_MERGE_WINDOW_S = 5.0
+WEIXIN_MERGE_WINDOW_S = 6.0
 
 
 def _build_client_version(version: str) -> int:
@@ -979,21 +979,6 @@ class WeixinChannel(BaseChannel):
         try:
             self._assert_session_active()
         except RuntimeError:
-            return
-
-        is_progress = bool((msg.metadata or {}).get("_progress", False))
-
-        # Progress / tool-hint messages bypass the merge buffer — they are
-        # small status updates that lose value if delayed.
-        if is_progress:
-            await self._send_now(msg)
-            return
-
-        # Messages carrying media bypass the buffer, but we must first flush
-        # any pending buffered text so that ordering is preserved.
-        if msg.media:
-            await self._flush_text_buffer(msg.chat_id)
-            await self._send_now(msg)
             return
 
         content = (msg.content or "").strip()

@@ -120,7 +120,7 @@ class StepFunImageGenerator:
         
         result = self._make_request("images/generations", data)
         
-        image_b64 = result["data"][0]["image"]
+        image_b64 = result["data"][0]["b64_json"]
         self._save_image(image_b64, output_path)
         
         print(f"图片已保存: {output_path}")
@@ -174,7 +174,7 @@ class StepFunImageGenerator:
         
         result = self._make_request("images/image2image", data)
         
-        image_b64 = result["data"][0]["image"]
+        image_b64 = result["data"][0]["b64_json"]
         self._save_image(image_b64, output_path)
         
         print(f"编辑后的图片已保存: {output_path}")

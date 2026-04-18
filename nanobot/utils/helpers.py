@@ -487,6 +487,17 @@ def sync_workspace_templates(workspace: Path, silent: bool = False) -> list[str]
                 check=True,
             )
             added.append(".venv")
+            # 在.venv/bin下面加一个pip指向uv pip
+            (workspace / ".venv" / "bin" / "pip").write_text(
+                "##!/bin/sh\nexec uv pip \"$@"
+            )
+            subprocess.run(
+                ["chmod", "+x", ".venv/bin/pip"],
+                cwd=workspace,
+                capture_output=True,
+                check=True,
+            )
+            added.append(".venv/bin/pip")
         except subprocess.CalledProcessError as e:
             logger.warning(f"Failed to create Python venv: {e.stderr.decode().strip()}")
         except FileNotFoundError:

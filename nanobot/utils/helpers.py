@@ -489,7 +489,7 @@ def sync_workspace_templates(workspace: Path, silent: bool = False) -> list[str]
             added.append(".venv")
             # 在.venv/bin下面加一个pip指向uv pip
             (workspace / ".venv" / "bin" / "pip").write_text(
-                "##!/bin/sh\nexec uv pip \"$@"
+                "#!/bin/sh\nexec uv pip \"$@\""
             )
             subprocess.run(
                 ["chmod", "+x", ".venv/bin/pip"],

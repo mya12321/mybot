@@ -23,7 +23,7 @@ metadata: {"nanobot":{"emoji":"🎨","requires":{"bins":["python3"],"env":["STEP
 
 # Prompt优化指南
 
-当用户提供简单的图片描述时，应该将其扩展为详细的英文Prompt：
+当用户提供简单的图片描述时，应该将其扩展为详细的英文Prompt, 需注意prompt最多为1024个字符：
 
 ## 示例
 
@@ -52,20 +52,30 @@ A futuristic cyberpunk cityscape at night, towering neon-lit skyscrapers, flying
 6. **氛围** - 情感、色调
 
 # 调用脚本生成图片
+
+## 文生图脚本调用
+
 ```bash
-python3 skills/image-generation/scripts/image_generation.py --model "step-2x-large" --prompt "prompt.md" --n 1 --size "1024x1024" --output "garden_puppy.png"
+python3 skills/image-generation/scripts/image_generation.py --model "step-2x-large" --promptFile "prompt.md" --outputFile "garden_puppy.png" --size "800x1280"
 ```
 
-## 参数说明
+## 图生图脚本调用
+
+```bash
+python3 skills/image-generation/scripts/image_generation.py --model "step-2x-large" --promptFile "prompt.md" --outputFile "garden_puppy.png" --sourceFile "source.png" --size "1024x1024"
+```
+
+## 脚本参数说明
 
 | 参数 | 类型 | 必需 | 说明 |
 |---|---|---|---|
-| `model` | string | 是 | 模型名称，固定为 `step-2x-large` |
-| `prompt` | string | 是 | 图片描述，建议英文，长度不超过4000字符 |
-| `n` | integer | 否 | 生成图片数量，默认1，最大4 |
+| `model` | string | 是 | 模型名称，当前固定为 `step-2x-large` |
+| `promptFile` | string | 是 | 图片描述文件路径, 格式为Markdown |
+| `outputFile` | string | 是 | 生成图片的文件路径, 必须是.png文件 |
+| `sourceFile` | string | 否 | 图生图的源图文件路径 |
 | `size` | string | 否 | 图片尺寸，默认1024x1024 |
 
-## 支持的尺寸
+## 图片支持的尺寸
 - `256x256, 512x512, 768x768, 1024x1024` - 正方形, 默认为1024x1024
 - `800x1280` - 竖屏
 - `1280x800` - 横屏

@@ -9,6 +9,7 @@ import sys
 import json
 import base64
 import argparse
+import mimetypes
 import urllib.request
 from datetime import datetime
 from typing import Optional
@@ -24,9 +25,7 @@ class StepFunImageGenerator:
     """阶跃星辰图片生成器"""
     
     BASE_URL = "https://api.stepfun.com/v1"
-    MODEL = "step-2x-large"
     
-    # 支持的图片尺寸
     VALID_SIZES = ["256x256", "512x512", "768x768", "1024x1024", "1280x800", "800x1280"]
     
     def __init__(self, api_key: Optional[str] = None):
@@ -70,25 +69,28 @@ class StepFunImageGenerator:
         except Exception as e:
             raise Exception(f"请求异常: {str(e)}")
     
-    def _download_image(self, image_url: str, output_path: str):
+    def _save_image(self, image_b64: str, output_path: str):
         """
-        下载图片到本地
+        将base64的图片保存成图片文件
         
         Args:
-            image_url: 图片URL
+            image_b64: 图片base64编码字符串
             output_path: 保存路径
         """
         try:
-            urllib.request.urlretrieve(image_url, output_path)
+            image_data = base64.b64decode(image_b64)
+            with open(output_path, "wb") as f:
+                f.write(image_data)
         except Exception as e:
-            raise Exception(f"图片下载失败: {str(e)}")
+            raise Exception(f"保存图片失败: {str(e)}")
+
     
-    def generate(
+    def text_to_image(
         self,
+        model: str,
         prompt: str,
         output_path: str = "generated_image.png",
-        size: str = "1024x1024",
-        n: int = 1
+        size: str = "1024x1024"
     ) -> str:
         """
         文生图 - 根据文本描述生成图片
@@ -96,8 +98,7 @@ class StepFunImageGenerator:
         Args:
             prompt: 图片生成提示词（建议使用英文）
             output_path: 输出图片路径
-            size: 图片尺寸，可选 1024x1024, 1024x1536, 1536x1024
-            n: 生成图片数量（1-4）
+            size: 图片尺寸
             
         Returns:
             生成的图片路径
@@ -105,142 +106,102 @@ class StepFunImageGenerator:
         if size not in self.VALID_SIZES:
             raise ValueError(f"不支持的尺寸: {size}，请使用: {', '.join(self.VALID_SIZES)}")
         
-        if not 1 <= n <= 4:
-            raise ValueError("n 必须在 1-4 之间")
-        
         data = {
-            "model": self.MODEL,
+            "model": model,
             "prompt": prompt,
-            "n": n,
+            "n": 1,
+            "response_format": "b64_json",
             "size": size
         }
         
         print(f"正在生成图片...")
-        print(f"提示词: {prompt[:100]}...")
+        print(f"提示词: {prompt[:80]}...")
         print(f"尺寸: {size}")
         
         result = self._make_request("images/generations", data)
         
-        # 下载图片
-        image_url = result["data"][0]["url"]
-        self._download_image(image_url, output_path)
+        image_b64 = result["data"][0]["image"]
+        self._save_image(image_b64, output_path)
         
         print(f"图片已保存: {output_path}")
         return output_path
     
-    def edit(
+    def image_to_image(
         self,
-        image_path: str,
+        model: str,
+        source_image_path: str,
         prompt: str,
         output_path: str = "edited_image.png",
-        size: str = "1024x1024",
-        n: int = 1
+        size: str = "1024x1024"
     ) -> str:
         """
         图生图 - 根据输入图片和描述生成新图片
         
         Args:
-            image_path: 输入图片路径
+            source_image_path: 输入图片路径
             prompt: 编辑提示词（建议使用英文）
             output_path: 输出图片路径
             size: 图片尺寸
-            n: 生成图片数量（1-4）
             
         Returns:
             生成的图片路径
         """
-        if not os.path.exists(image_path):
-            raise FileNotFoundError(f"图片不存在: {image_path}")
+        if not os.path.exists(source_image_path):
+            raise FileNotFoundError(f"源图片不存在: {source_image_path}")
         
         if size not in self.VALID_SIZES:
             raise ValueError(f"不支持的尺寸: {size}，请使用: {', '.join(self.VALID_SIZES)}")
         
-        if not 1 <= n <= 4:
-            raise ValueError("n 必须在 1-4 之间")
-        
-        # 读取图片并转为base64
-        with open(image_path, "rb") as f:
+        with open(source_image_path, "rb") as f:
             image_data = f.read()
             image_base64 = base64.b64encode(image_data).decode("utf-8")
         
-        # 检测图片格式
-        ext = os.path.splitext(image_path)[1].lower()
-        mime_type = "image/png" if ext == ".png" else "image/jpeg"
-        
+        mime_type, _ = mimetypes.guess_type(source_image_path)
+               
         data = {
-            "model": self.MODEL,
-            "image": f"data:{mime_type};base64,{image_base64}",
+            "model": model,
+            "source_url": f"data:{mime_type};base64,{image_base64}",
+            "source_weight": 0.5,
             "prompt": prompt,
-            "n": n,
+            "n": 1,
+            "response_format": "b64_json",
             "size": size
         }
         
-        print(f"正在编辑图片...")
-        print(f"输入图片: {image_path}")
-        print(f"提示词: {prompt[:100]}...")
+        print(f"正在生成图片...")
+        print(f"输入图片: {source_image_path}")
+        print(f"提示词: {prompt[:80]}...")
         
-        result = self._make_request("images/edits", data)
+        result = self._make_request("images/image2image", data)
         
-        # 下载图片
-        image_url = result["data"][0]["url"]
-        self._download_image(image_url, output_path)
+        image_b64 = result["data"][0]["image"]
+        self._save_image(image_b64, output_path)
         
         print(f"编辑后的图片已保存: {output_path}")
         return output_path
 
 
-def save_prompt_to_file(
-    original_prompt: str,
-    optimized_prompt: str,
-    output_dir: str = "."
-) -> str:
+def read_prompt_file(prompt_file: str) -> str:
     """
-    将prompt保存到markdown文件
+    读取prompt文件内容
     
     Args:
-        original_prompt: 用户原始输入
-        optimized_prompt: 优化后的prompt
-        output_dir: 输出目录
+        prompt_file: prompt文件路径
         
     Returns:
-        保存的文件路径
+        prompt内容
     """
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    filename = f"prompt_{timestamp}.md"
-    filepath = os.path.join(output_dir, filename)
+    if not os.path.exists(prompt_file):
+        raise FileNotFoundError(f"Prompt文件不存在: {prompt_file}")
     
-    content = f"""# Image Generation Prompt
+    with open(prompt_file, "r", encoding="utf-8") as f:
+        content = f.read()
 
-## 生成时间
-{datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
-
-## 用户原始描述
-{original_prompt}
-
-## 优化后的Prompt
-```
-{optimized_prompt}
-```
-
-## Prompt要素分析
-- **主体**: 
-- **环境**: 
-- **风格**: 
-- **光线**: 
-- **质量**: 
-- **氛围**: 
-
-## 生成参数
-- 模型: step-2x-large
-- 尺寸: 1024x1024
-- 数量: 1
-"""
+    content = content.strip()
+    if len(content) > 1024:
+        raise ValueError("Prompt内容最多为1024个字符")
     
-    with open(filepath, "w", encoding="utf-8") as f:
-        f.write(content)
-    
-    print(f"Prompt已保存: {filepath}")
-    return filepath
+    return content
 
 
 def main():
@@ -251,84 +212,62 @@ def main():
         epilog="""
 示例:
   # 文生图
-  python generate_image.py -p "A beautiful sunset over mountains"
+  python image_generation.py --model "step-2x-large" --promptFile "prompt.md" --outputFile "garden_puppy.png" --size "800x1280"
   
   # 图生图
-  python generate_image.py -i input.png -p "Transform into watercolor style"
-  
-  # 指定输出路径和尺寸
-  python generate_image.py -p "A cute cat" -o mycat.png -s 1024x1536
+  python image_generation.py --model "step-2x-large" --promptFile "prompt.md" --outputFile "garden_puppy.png" --sourceFile "source.png" --size "1024x1024"
         """
     )
     
     parser.add_argument(
-        "-p", "--prompt",
+        "--model",
         required=True,
-        help="图片生成提示词（建议使用英文）"
+        help="模型名称，当前固定为 step-2x-large"
     )
     parser.add_argument(
-        "-i", "--image",
-        help="输入图片路径（用于图生图）"
+        "--promptFile",
+        required=True,
+        help="图片描述文件路径, 格式为Markdown"
     )
     parser.add_argument(
-        "-o", "--output",
-        default="generated_image.png",
-        help="输出图片路径（默认: generated_image.png）"
+        "--outputFile",
+        required=True,
+        help="生成图片的文件路径"
     )
     parser.add_argument(
-        "-s", "--size",
+        "--sourceFile",
+        help="图生图的源图文件路径"
+    )
+    parser.add_argument(
+        "--size",
         default="1024x1024",
-        choices=["1024x1024", "1024x1536", "1536x1024"],
-        help="图片尺寸（默认: 1024x1024）"
-    )
-    parser.add_argument(
-        "-n",
-        type=int,
-        default=1,
-        help="生成数量 1-4（默认: 1）"
-    )
-    parser.add_argument(
-        "--save-prompt",
-        action="store_true",
-        help="是否保存prompt到markdown文件"
-    )
-    parser.add_argument(
-        "--original-prompt",
-        help="用户原始描述（用于保存prompt文件）"
-    )
-    parser.add_argument(
-        "--api-key",
-        help="阶跃星辰API Key（默认从环境变量 STEPFUN_API_KEY 获取）"
+        help="图片尺寸，默认1024x1024"
     )
     
     args = parser.parse_args()
     
     try:
-        # 初始化生成器
-        generator = StepFunImageGenerator(api_key=args.api_key)
+        generator = StepFunImageGenerator()
         
-        # 保存prompt到文件
-        if args.save_prompt:
-            original = args.original_prompt or args.prompt
-            save_prompt_to_file(original, args.prompt)
+        if not args.outputFile.endswith(".png"):
+            raise ValueError("输出文件必须必须是.png文件")
+
+        prompt = read_prompt_file(args.promptFile)
         
-        # 生成图片
-        if args.image:
-            # 图生图
-            generator.edit(
-                image_path=args.image,
-                prompt=args.prompt,
-                output_path=args.output,
-                size=args.size,
-                n=args.n
+        if args.sourceFile:
+            generator.image_to_image(
+                model=args.model,
+                source_image_path=args.sourceFile,
+                prompt=prompt,
+                output_path=args.outputFile,
+                size=args.size
             )
         else:
-            # 文生图
-            generator.generate(
-                prompt=args.prompt,
-                output_path=args.output,
-                size=args.size,
-                n=args.n
+            generator.text_to_image(
+                model=args.model,
+                prompt=prompt,
+                output_path=args.outputFile,
+                size=args.size
             )
         
         print("✓ 完成!")

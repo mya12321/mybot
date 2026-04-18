@@ -49,7 +49,6 @@ def _bwrap(command: str, workspace: str, cwd: str) -> str:
         "NVM_BIN",
         "NVM_DIR",
         "NVM_INC",
-        "PATH",
         "TERM",
         *_load_allowed_env_keys(ws.parent / "config.json"),
     ]
@@ -68,20 +67,28 @@ def _bwrap(command: str, workspace: str, cwd: str) -> str:
         "/etc/ssl/certs",
         "/etc/resolv.conf",
         "/etc/ld.so.cache",
-        "/root/.nvm",
         "/root/.local",
     ]
+    dependencies = ["/root/.nvm"]
 
     args = ["bwrap", "--new-session", "--die-with-parent", "--share-net", "--clearenv"]
     for p in required:
         args += ["--ro-bind", p, p]
     for p in optional:
         args += ["--ro-bind-try", p, p]
+    for p in dependencies:
+        args += ["--bind-try", p, p]
     for key in allowed_env_keys:
         value = os.environ.get(key)
         if value is not None:
             args += ["--setenv", key, value]
     args += [
+        "--setenv",
+        "VIRTUAL_ENV",
+        str(ws / ".venv"),
+        "--setenv",
+        "PATH",
+        f"{str(ws / '.venv' / 'bin')}:{os.environ.get('PATH')}",
         "--proc",
         "/proc",
         "--dev",

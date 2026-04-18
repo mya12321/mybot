@@ -4,6 +4,7 @@ import base64
 import json
 import re
 import shutil
+import subprocess
 import time
 import uuid
 from datetime import datetime
@@ -475,17 +476,33 @@ def sync_workspace_templates(workspace: Path, silent: bool = False) -> list[str]
             shutil.copy2(item, target)
             added.append(str(target.relative_to(workspace)))
 
+    def _process_python_venv():
+        if (workspace / ".venv").exists():
+            return
+        try:
+            subprocess.run(
+                ["uv", "venv", "--python", "3.14"],
+                cwd=workspace,
+                capture_output=True,
+                check=True,
+            )
+            added.append(".venv")
+        except subprocess.CalledProcessError as e:
+            logger.warning(f"Failed to create Python venv: {e.stderr.decode().strip()}")
+        except FileNotFoundError:
+            logger.warning("uv not found, skipping Python venv creation")
+
     for item in tpl.iterdir():
         if item.name.endswith(".md") and not item.name.startswith("."):
             _write(item, workspace / item.name)
     _write(tpl / "memory" / "MEMORY.md", workspace / "memory" / "MEMORY.md")
     _write(None, workspace / "memory" / "history.jsonl")
     _skill_copy(tpl.parent / "skills", workspace / "skills")
+    _process_python_venv()
 
     if added and not silent:
-        from rich.console import Console
         for name in added:
-            Console().print(f"  [dim]Created {name}[/dim]")
+            logger.info(f"  [dim]Created {name}[/dim]")
 
     # Initialize git for memory version control
     try:

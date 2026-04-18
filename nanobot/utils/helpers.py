@@ -497,6 +497,8 @@ def sync_workspace_templates(workspace: Path, silent: bool = False) -> list[str]
                 capture_output=True,
                 check=True,
             )
+            # 对pip3创建一个软链接指向pip
+            (workspace / ".venv" / "bin" / "pip3").symlink_to(workspace / ".venv" / "bin" / "pip")
             added.append(".venv/bin/pip")
         except subprocess.CalledProcessError as e:
             logger.warning(f"Failed to create Python venv: {e.stderr.decode().strip()}")

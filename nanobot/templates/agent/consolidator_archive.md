@@ -1,4 +1,5 @@
-<fact_extraction>
+# Fact Extraction
+
 Extract key facts from this conversation. Only output items matching these categories:
 
 - **User facts**: personal info, preferences, stated opinions, habits
@@ -14,4 +15,3 @@ The most valuable memory prevents the user from having to repeat themselves.
 
 Output as concise bullet points, one fact per line. No preamble, no commentary.
 If nothing noteworthy, output: `(nothing)`
-</fact_extraction>

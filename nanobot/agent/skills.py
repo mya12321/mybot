@@ -113,31 +113,30 @@ class SkillsLoader:
         skill content using read_file when needed.
 
         Returns:
-            XML-formatted skills summary.
+            Markdown-formatted skills summary.
         """
         all_skills = self.list_skills(filter_unavailable=False)
         if not all_skills:
             return ""
 
-        lines: list[str] = ["<skills>"]
+        lines: list[str] = ["## Available Skills", ""]
         for entry in all_skills:
             skill_name = entry["name"]
             meta = self._get_skill_meta(skill_name)
             available = self._check_requirements(meta)
+            status = "✓" if available else "✗"
             lines.extend(
                 [
-                    f'  <skill available="{str(available).lower()}">',
-                    f"    <name>{_escape_xml(skill_name)}</name>",
-                    f"    <description>{_escape_xml(self._get_skill_description(skill_name))}</description>",
-                    f"    <location>{entry['path']}</location>",
+                    f"- **{skill_name}** {status}",
+                    f"  - Description: {self._get_skill_description(skill_name)}",
+                    f"  - Location: `{entry['path']}`",
                 ]
             )
             if not available:
                 missing = self._get_missing_requirements(meta)
                 if missing:
-                    lines.append(f"    <requires>{_escape_xml(missing)}</requires>")
-            lines.append("  </skill>")
-        lines.append("</skills>")
+                    lines.append(f"  - Requires: {missing}")
+            lines.append("")
         return "\n".join(lines)
 
     def _get_missing_requirements(self, skill_meta: dict) -> str:

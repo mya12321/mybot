@@ -594,7 +594,6 @@ async def test_agent_loop_no_hooks_backward_compat(tmp_path):
         [], runtime=loop.llm_runtime()
     )
     assert content == (
-        "I reached the maximum number of tool call iterations (2) "
-        "without completing the task. You can try breaking the task into smaller steps."
+        "Reached the maximum call iterations (2). Try breaking the task into smaller steps."
     )
     assert tools_used == ["list_dir", "list_dir"]

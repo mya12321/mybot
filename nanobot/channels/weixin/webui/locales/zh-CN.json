@@ -35,6 +35,7 @@
       "cdnBaseUrl": { "label": "CDN 地址" },
       "routeTag": { "label": "路由标签" },
       "stateDir": { "label": "状态目录" },
+      "accountId": { "label": "账号 ID" },
       "pollTimeout": { "label": "轮询超时" }
     }
   },

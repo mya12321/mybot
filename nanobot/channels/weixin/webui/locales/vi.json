@@ -34,6 +34,7 @@
       "cdnBaseUrl": { "label": "URL CDN" },
       "routeTag": { "label": "Thẻ định tuyến" },
       "stateDir": { "label": "Thư mục trạng thái" },
+      "accountId": { "label": "ID tài khoản" },
       "pollTimeout": { "label": "Thời gian chờ thăm dò" }
     }
   },

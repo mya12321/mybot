@@ -34,6 +34,7 @@
       "cdnBaseUrl": { "label": "CDN URL" },
       "routeTag": { "label": "경로 태그" },
       "stateDir": { "label": "상태 디렉터리" },
+      "accountId": { "label": "계정 ID" },
       "pollTimeout": { "label": "폴링 제한 시간" }
     }
   },

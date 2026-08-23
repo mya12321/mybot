@@ -34,6 +34,7 @@
       "cdnBaseUrl": { "label": "URL CDN" },
       "routeTag": { "label": "Tag rute" },
       "stateDir": { "label": "Direktori status" },
+      "accountId": { "label": "ID akun" },
       "pollTimeout": { "label": "Batas waktu polling" }
     }
   },

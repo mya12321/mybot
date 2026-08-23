@@ -35,6 +35,7 @@
       "cdnBaseUrl": { "label": "CDN 位址" },
       "routeTag": { "label": "路由標籤" },
       "stateDir": { "label": "狀態目錄" },
+      "accountId": { "label": "帳號 ID" },
       "pollTimeout": { "label": "輪詢逾時" }
     }
   },

@@ -34,6 +34,7 @@
       "cdnBaseUrl": { "label": "URL da CDN" },
       "routeTag": { "label": "Etiqueta de rota" },
       "stateDir": { "label": "Diretório de estado" },
+      "accountId": { "label": "ID da conta" },
       "pollTimeout": { "label": "Tempo limite da consulta" }
     }
   },

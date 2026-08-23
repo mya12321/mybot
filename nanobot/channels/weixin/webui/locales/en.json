@@ -34,6 +34,7 @@
       "cdnBaseUrl": { "label": "CDN URL" },
       "routeTag": { "label": "Route tag" },
       "stateDir": { "label": "State directory" },
+      "accountId": { "label": "Account ID" },
       "pollTimeout": { "label": "Poll timeout" }
     }
   },

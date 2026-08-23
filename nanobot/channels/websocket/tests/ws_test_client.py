@@ -21,6 +21,7 @@ from typing import Any
 import httpx
 import websockets
 from websockets.asyncio.client import ClientConnection
+from websockets.exceptions import ConnectionClosed, InvalidMessage
 from websockets.datastructures import Headers
 from websockets.http11 import Request as WsRequest
 
@@ -150,7 +151,11 @@ class WsTestClient:
                     additional_headers=self._extra_headers,
                 )
                 return
-            except OSError:
+            except (OSError, ConnectionClosed, InvalidMessage):
+                # Race the server's startup: the socket may be bound but not yet
+                # accepting, so the handshake can be dropped before any status
+                # line arrives. Genuine HTTP rejections (e.g. 401 via
+                # InvalidStatus) are NOT caught here, so auth tests still see them.
                 if asyncio.get_running_loop().time() >= deadline:
                     raise
                 await asyncio.sleep(0.01)

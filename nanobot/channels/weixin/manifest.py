@@ -15,6 +15,7 @@ SETUP_SPEC = ChannelSetupSpec(
         "cdnBaseUrl": field(default="https://novac2c.cdn.weixin.qq.com/c2c"),
         "routeTag": field(),
         "stateDir": field(),
+        "accountId": field(default="default"),
         "pollTimeout": field("int", default=35),
         "sendProgress": field("bool", default=False),
         "sendToolHints": field("bool", default=False),

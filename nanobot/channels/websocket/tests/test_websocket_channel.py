@@ -13,7 +13,7 @@ import httpx
 import pytest
 import websockets
 from websockets.datastructures import Headers
-from websockets.exceptions import ConnectionClosed
+from websockets.exceptions import ConnectionClosed, InvalidMessage
 from websockets.frames import Close
 
 from nanobot.bus.events import (
@@ -137,7 +137,9 @@ async def _connect_when_ready(url: str) -> Any:
     while True:
         try:
             return await websockets.connect(url)
-        except OSError:
+        except (OSError, ConnectionClosed, InvalidMessage):
+            # Server may be bound-but-not-yet-accepting racing the handshake;
+            # genuine HTTP rejections (InvalidStatus) are not caught here.
             await asyncio.sleep(0.02)
 
 

@@ -86,6 +86,7 @@ def test_callback_server_accepts_only_matching_state_and_allows_accounts_origin(
             f"http://127.0.0.1:{server.server_port}/callback",
             params={"code": "one-time-code", "state": "expected-state"},
             headers={"Origin": "https://accounts.x.ai"},
+            trust_env=False,
         )
         result = results.get(timeout=1)
     finally:
@@ -134,7 +135,7 @@ def test_login_uses_random_loopback_callback_and_saves_separate_credentials(
         params = parse_qs(urlsplit(authorize_url).query)
         callback_url = params["redirect_uri"][0]
         callback_query = urlencode({"code": "auth-code", "state": params["state"][0]})
-        response = httpx.get(f"{callback_url}?{callback_query}")
+        response = httpx.get(f"{callback_url}?{callback_query}", trust_env=False)
         assert response.status_code == 200
         return True
 

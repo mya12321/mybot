@@ -206,6 +206,7 @@ class WeixinConfig(Base):
     route_tag: str | int | None = None
     token: str = ""  # Manually set token, or obtained via QR login
     state_dir: str = ""  # Default: ~/.nanobot/weixin/
+    account_id: str = "default"  # Logical account id / state isolation key
     poll_timeout: int = DEFAULT_LONG_POLL_TIMEOUT_S  # seconds for long-poll
     # Extra progress messages consume the same undocumented iLink send quota as
     # final replies. Keep them off unless an operator explicitly opts in.
@@ -378,13 +379,21 @@ class WeixinChannel(BaseChannel):
         self._state_dir = d
         return d
 
+    def _get_state_file(self) -> Path:
+        """Return the account-specific state file for this logical channel."""
+        account_id = str(self.config.account_id or "default").strip()
+        safe_id = re.sub(r"[^A-Za-z0-9._-]+", "_", account_id)
+        if safe_id in {"", "default"}:
+            return self._get_state_dir() / "account.json"
+        return self._get_state_dir() / f"account_{safe_id}.json"
+
     @staticmethod
     def _token_fingerprint(token: str) -> str:
         return hashlib.sha256(token.encode()).hexdigest() if token else ""
 
     def _load_state(self, *, required_replaced_config_token: str | None = None) -> bool:
         """Load saved account state. Returns True if a valid token was found."""
-        state_file = self._get_state_dir() / "account.json"
+        state_file = self._get_state_file()
         if not state_file.exists():
             return False
         try:
@@ -427,7 +436,7 @@ class WeixinChannel(BaseChannel):
             return False
 
     def _save_state(self, *, force: bool = False) -> None:
-        state_file = self._get_state_dir() / "account.json"
+        state_file = self._get_state_file()
         with suppress(Exception):
             if not force and state_file.exists():
                 persisted: object = None
@@ -502,16 +511,22 @@ class WeixinChannel(BaseChannel):
         try:
             full_config = load_config()
             section = getattr(full_config.channels, "weixin", None)
-            if section is not None and hasattr(section, "model_dump"):
-                values = section.model_dump(mode="json", by_alias=True)
-            elif isinstance(section, dict):
-                values = dict(cast(dict[str, Any], section))
-            else:
-                values = {}
-            values["token"] = token
+            from nanobot.channels.contracts import channel_update_instance_config
+            from nanobot.channels.registry import load_channel_plugin
+
+            values: dict[str, Any] = {
+                "token": token,
+                "accountId": str(self.config.account_id or "default").strip(),
+            }
             if base_url:
                 values["baseUrl"] = base_url
-            setattr(full_config.channels, "weixin", values)
+            updated = channel_update_instance_config(
+                load_channel_plugin("weixin"),
+                section,
+                values,
+                instance_id=str(self.config.account_id or "default").strip(),
+            )
+            setattr(full_config.channels, "weixin", updated)
             save_config(full_config, get_config_path())
         except Exception:
             self.logger.exception("Failed to persist WeChat credentials to config.json")
@@ -739,7 +754,7 @@ class WeixinChannel(BaseChannel):
     def _local_token_list(self) -> list[str]:
         """Return known local bot tokens, newest first, without exposing them."""
         candidates = [self._token, self.config.token]
-        state_file = self._get_state_dir() / "account.json"
+        state_file = self._get_state_file()
         if state_file.exists():
             with suppress(Exception):
                 persisted = json.loads(state_file.read_text())

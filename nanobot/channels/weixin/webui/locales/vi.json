@@ -38,6 +38,16 @@
     }
   },
   "custom": {
+    "toggleAccount": "Tài khoản {{name}}",
+    "configured": "Đã kết nối",
+    "needsSetup": "Cần đăng nhập",
+    "connectAccount": "Kết nối tài khoản",
+    "installSupport": "Cài đặt hỗ trợ WeChat",
+    "addAccount": "Thêm tài khoản khác",
+    "addAccountHint": "Thêm ID tài khoản mới trong cài đặt kênh WeChat, rồi kết nối tại đây.",
+    "countNone": "Chưa kết nối tài khoản WeChat",
+    "countOne": "Đã kết nối 1 tài khoản WeChat",
+    "countMany": "Đã kết nối {{count}} tài khoản WeChat",
     "qrAlt": "Mã QR đăng nhập WeChat",
     "scanTitle": "Quét bằng WeChat",
     "scanDescription": "Quét bằng WeChat trên điện thoại. nanobot lưu trạng thái cục bộ sau khi đăng nhập.",

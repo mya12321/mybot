@@ -38,6 +38,16 @@
     }
   },
   "custom": {
+    "toggleAccount": "Akun {{name}}",
+    "configured": "Terhubung",
+    "needsSetup": "Perlu login",
+    "connectAccount": "Hubungkan akun",
+    "installSupport": "Pasang dukungan WeChat",
+    "addAccount": "Tambah akun lain",
+    "addAccountHint": "Tambahkan ID akun baru di pengaturan kanal WeChat, lalu hubungkan di sini.",
+    "countNone": "Belum ada akun WeChat terhubung",
+    "countOne": "1 akun WeChat terhubung",
+    "countMany": "{{count}} akun WeChat terhubung",
     "qrAlt": "Kode QR login WeChat",
     "scanTitle": "Pindai dengan WeChat",
     "scanDescription": "Pindai dengan WeChat di ponsel. nanobot menyimpan status akun secara lokal setelah login.",

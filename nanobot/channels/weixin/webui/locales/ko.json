@@ -38,6 +38,16 @@
     }
   },
   "custom": {
+    "toggleAccount": "{{name}} 계정",
+    "configured": "연결됨",
+    "needsSetup": "로그인 필요",
+    "connectAccount": "계정 연결",
+    "installSupport": "WeChat 지원 설치",
+    "addAccount": "다른 계정 추가",
+    "addAccountHint": "WeChat 채널 설정에서 새 계정 ID를 추가한 다음 연결하세요.",
+    "countNone": "연결된 WeChat 계정 없음",
+    "countOne": "WeChat 계정 1개 연결됨",
+    "countMany": "WeChat 계정 {{count}}개 연결됨",
     "qrAlt": "WeChat 로그인 QR 코드",
     "scanTitle": "WeChat으로 스캔",
     "scanDescription": "휴대폰 WeChat으로 스캔하세요. 로그인 후 nanobot이 계정 상태를 로컬에 저장합니다.",

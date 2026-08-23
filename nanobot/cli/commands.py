@@ -526,6 +526,7 @@ def channels_status(
 def channels_login(
     channel_name: str = typer.Argument(..., help="Channel name (e.g. weixin, whatsapp)"),
     force: bool = typer.Option(False, "--force", "-f", help="Force re-authentication even if already logged in"),
+    account: str | None = typer.Option(None, "--account", "-a", help="Logical account id (for multi-account channels like weixin)"),
     config: str | None = typer.Option(None, "--config", "-c", help="Path to config file"),
 ):
     """Authenticate with a channel via QR code or other interactive login."""
@@ -543,6 +544,21 @@ def channels_login(
         raise typer.Exit(1)
 
     console.print(f"{__logo__} {all_channels[channel_name].display_name} Login\n")
+
+    if channel_name == "weixin" and isinstance(channel_cfg, dict):
+        from nanobot.channels.weixin.instances import managed_weixin_instance_specs
+
+        specs = managed_weixin_instance_specs(channel_cfg, enabled_only=False)
+        if len(specs) > 1 and not account:
+            console.print("[red]Weixin has multiple configured accounts; please pass --account.[/red]")
+            raise typer.Exit(1)
+        selected = account or str(specs[0].instance_id if specs else "default")
+        channel_cfg = next(
+            (spec.config for spec in specs if spec.instance_id == selected),
+            None,
+        )
+        if channel_cfg is None:
+            channel_cfg = {"account_id": selected}
 
     channel_factory = all_channels[channel_name]
     channel = channel_factory(channel_cfg, bus=MessageBus())

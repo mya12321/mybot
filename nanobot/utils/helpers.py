@@ -6,6 +6,8 @@ import os
 import re
 import shutil
 import stat
+import subprocess
+import sys
 import time
 import uuid
 from contextlib import suppress
@@ -847,7 +849,7 @@ def build_status_content(
 def sync_workspace_templates(workspace: Path, silent: bool = False) -> list[str]:
     """Sync bundled templates to workspace. Creates missing files without overwriting user files."""
     from importlib.resources import files as pkg_files
-
+    workspace.mkdir(parents=True, exist_ok=True)
     try:
         tpl = pkg_files("nanobot") / "templates"
     except Exception:
@@ -865,19 +867,64 @@ def sync_workspace_templates(workspace: Path, silent: bool = False) -> list[str]
         dest.write_text(content, encoding="utf-8")
         added.append(str(dest.relative_to(workspace)))
 
+    def _skill_copy(src, dest: Path):
+        if dest.exists():
+            return
+        if not src.exists() or not src.is_dir():
+            return
+        for item in src.rglob("*"):
+            if item.is_dir():
+                continue
+            rel = item.relative_to(src)
+            target = dest / rel
+            if target.exists():
+                continue
+            target.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(item, target)
+            added.append(str(target.relative_to(workspace)))
+
+    def _process_python_venv():
+        if (workspace / ".venv").exists():
+            return
+        try:
+            python_version = f"{sys.version_info.major}.{sys.version_info.minor}"
+            subprocess.run(
+                ["uv", "venv", "--python", python_version],
+                cwd=workspace,
+                capture_output=True,
+                check=True,
+            )
+            added.append(".venv")
+            # 在.venv/bin下面加一个pip指向uv pip
+            (workspace / ".venv" / "bin" / "pip").write_text(
+                "#!/bin/sh\nexec uv pip \"$@\""
+            )
+            subprocess.run(
+                ["chmod", "+x", ".venv/bin/pip"],
+                cwd=workspace,
+                capture_output=True,
+                check=True,
+            )
+            # 对pip3创建一个软链接指向pip
+            (workspace / ".venv" / "bin" / "pip3").symlink_to(workspace / ".venv" / "bin" / "pip")
+            added.append(".venv/bin/pip")
+        except subprocess.CalledProcessError as e:
+            logger.warning("Failed to create Python venv: {}", e.stderr.decode().strip())
+        except FileNotFoundError:
+            logger.warning("uv not found, skipping Python venv creation")
+
     for item in tpl.iterdir():
         if item.name.endswith(".md") and not item.name.startswith("."):
             _write(item, workspace / item.name)
     _write(tpl / "memory" / "MEMORY.md", workspace / "memory" / "MEMORY.md")
     _write(tpl / "prompts" / "README.md", workspace / "prompts" / "README.md")
     _write(None, workspace / "memory" / "history.jsonl")
-    (workspace / "skills").mkdir(exist_ok=True)
+    _skill_copy(tpl.parent / "skills", workspace / "skills")
+    _process_python_venv()
 
     if added and not silent:
-        from rich.console import Console
-
         for name in added:
-            Console().print(f"  [dim]Created {name}[/dim]")
+            logger.info("Created workspace file: {}", name)
 
     # Initialize git for memory version control
     try:

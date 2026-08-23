@@ -5,9 +5,10 @@ from __future__ import annotations
 import secrets
 import time
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any
 
 from nanobot.channels.connect import ChannelConnectError, QueryParams, query_first
+from nanobot.channels.weixin.instances import DEFAULT_INSTANCE_ID, managed_weixin_instance_specs
 from nanobot.config.loader import load_config
 
 if TYPE_CHECKING:
@@ -17,6 +18,7 @@ if TYPE_CHECKING:
 @dataclass(slots=True)
 class WeixinConnectSession:
     id: str
+    instance_id: str
     qrcode_id: str
     qr_url: str
     channel: WeixinChannel
@@ -42,7 +44,10 @@ class WeixinConnectStore:
                 "true",
                 "yes",
             }
-            return await self.start(force=force)
+            return await self.start(
+                force=force,
+                instance_id=(query_first(query, "instance_id") or DEFAULT_INSTANCE_ID).strip(),
+            )
 
         session_id = (query_first(query, "session_id") or "").strip()
         if not session_id:
@@ -56,16 +61,22 @@ class WeixinConnectStore:
             return await self.cancel(session_id)
         raise ChannelConnectError(f"unsupported WeChat connect action: {action}", status=404)
 
-    async def start(self, *, force: bool = False) -> dict[str, Any]:
+    async def start(
+        self,
+        *,
+        force: bool = False,
+        instance_id: str = DEFAULT_INSTANCE_ID,
+    ) -> dict[str, Any]:
         await self._cleanup()
 
-        channel = self._build_channel()
+        channel = self._build_channel(instance_id=instance_id)
         if force:
             # Preserve the working account until a replacement scan succeeds.
             channel.connect_reset_pending_credentials()
         elif channel.connect_load_state():
             return {
                 "session_id": "",
+                "instance_id": instance_id,
                 "status": "succeeded",
                 "message": "WeChat is already connected.",
                 "interval_ms": 2000,
@@ -85,6 +96,7 @@ class WeixinConnectStore:
         now_wall = time.time()
         self._sessions[session_id] = WeixinConnectSession(
             id=session_id,
+            instance_id=instance_id,
             qrcode_id=qrcode_id,
             qr_url=qr_url,
             channel=channel,
@@ -150,6 +162,7 @@ class WeixinConnectStore:
             await self._close_channel(session.channel)
             return {
                 "session_id": session_id,
+                "instance_id": session.instance_id,
                 "status": "succeeded",
                 "message": "WeChat is connected.",
                 "account": str(status_payload.get("ilink_user_id", "") or ""),
@@ -231,6 +244,7 @@ class WeixinConnectStore:
             await self._close_channel(session.channel)
             return {
                 "session_id": session_id,
+                "instance_id": session.instance_id,
                 "status": "succeeded",
                 "message": "WeChat is already connected to this nanobot instance.",
             }
@@ -285,17 +299,18 @@ class WeixinConnectStore:
                 await self._close_channel(session.channel)
 
     @staticmethod
-    def _build_channel() -> WeixinChannel:
+    def _build_channel(*, instance_id: str = DEFAULT_INSTANCE_ID) -> WeixinChannel:
         from nanobot.bus.queue import MessageBus
         from nanobot.channels.weixin.runtime import WeixinChannel
 
         section = getattr(load_config().channels, "weixin", None)
         if section is not None and hasattr(section, "model_dump"):
-            config = section.model_dump(mode="json", by_alias=True)
-        elif isinstance(section, dict):
-            config = dict(cast(dict[str, Any], section))
-        else:
-            config = {}
+            section = section.model_dump(mode="json", by_alias=True)
+        config: dict[str, Any] = {}
+        for spec in managed_weixin_instance_specs(section or {}, enabled_only=False):
+            if spec.instance_id == instance_id:
+                config = spec.config
+                break
         return WeixinChannel(config, MessageBus())
 
     @staticmethod
@@ -306,6 +321,7 @@ class WeixinConnectStore:
     def _start_payload(session: WeixinConnectSession) -> dict[str, Any]:
         return {
             "session_id": session.id,
+            "instance_id": session.instance_id,
             "status": "pending",
             "qr_url": session.qr_url,
             "interval_ms": 2000,
@@ -323,6 +339,7 @@ class WeixinConnectStore:
     ) -> dict[str, Any]:
         payload: dict[str, Any] = {
             "session_id": session.id,
+            "instance_id": session.instance_id,
             "status": "pending",
             "qr_url": session.qr_url,
             "interval_ms": 2000,

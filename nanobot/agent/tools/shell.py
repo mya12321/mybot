@@ -349,6 +349,11 @@ class ExecTool(Tool):
                 )
             except asyncio.TimeoutError:
                 await self._kill_process_tree(process)
+                logger.error(
+                    "Command timed out after {timeout} seconds: {command}",
+                    timeout=prepared.timeout,
+                    command=prepared.command,
+                )
                 return ToolResult.error(f"Error: Command timed out after {prepared.timeout} seconds")
             except asyncio.CancelledError:
                 await self._kill_process_tree(process)
@@ -383,6 +388,7 @@ class ExecTool(Tool):
                 )
 
             self._release_process_tree(process)
+            logger.debug("Command output: {}", result)
             return result
 
         except Exception as e:
@@ -390,6 +396,7 @@ class ExecTool(Tool):
             # error prevented communicate() from completing.
             if process is not None:
                 await self._kill_process_tree(process)
+            logger.error("Error executing command: {error}", error=str(e))
             return ToolResult.error(f"Error executing command: {str(e)}")
 
     async def _execute_session(

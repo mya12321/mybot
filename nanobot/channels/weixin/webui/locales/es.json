@@ -38,6 +38,16 @@
     }
   },
   "custom": {
+    "toggleAccount": "Cuenta {{name}}",
+    "configured": "Conectado",
+    "needsSetup": "Requiere inicio de sesión",
+    "connectAccount": "Conectar cuenta",
+    "installSupport": "Instalar soporte de WeChat",
+    "addAccount": "Añadir otra cuenta",
+    "addAccountHint": "Añade un nuevo ID de cuenta en los ajustes del canal WeChat y conéctalo aquí.",
+    "countNone": "Ninguna cuenta de WeChat conectada",
+    "countOne": "1 cuenta de WeChat conectada",
+    "countMany": "{{count}} cuentas de WeChat conectadas",
     "qrAlt": "Código QR de inicio de WeChat",
     "scanTitle": "Escanea con WeChat",
     "scanDescription": "Escanea con WeChat en tu teléfono. nanobot guarda el estado localmente después del inicio.",

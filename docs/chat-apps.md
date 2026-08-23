@@ -831,7 +831,11 @@ nanobot plugins enable weixin
   "channels": {
     "weixin": {
       "enabled": true,
-      "allowFrom": ["YOUR_WECHAT_USER_ID"]
+      "allowFrom": ["YOUR_WECHAT_USER_ID"],
+      "accounts": [
+        { "id": "personal" },
+        { "id": "work", "routeTag": "work-route" }
+      ]
     }
   }
 }
@@ -842,6 +846,8 @@ nanobot plugins enable weixin
 > - `routeTag`: Optional. When your upstream Weixin deployment requires request routing, nanobot will send it as the `SKRouteTag` header.
 > - `stateDir`: Optional. Defaults to nanobot's runtime directory for Weixin state.
 > - `pollTimeout`: Optional long-poll timeout in seconds.
+> - `accounts`: Optional. Configure multiple Weixin accounts, each with its own `id` and optional overrides such as `stateDir`, `routeTag`, `allowFrom`, and `token`. Omit `accounts` for the default single account.
+> - `accountId`: Optional for single-account mode. Defaults to `default`.
 
 **3. Login**
 
@@ -853,6 +859,13 @@ Use `--force` to re-authenticate and ignore any saved token:
 
 ```bash
 nanobot channels login weixin --force
+```
+
+If you configured multiple accounts, select one with `--account`:
+
+```bash
+nanobot channels login weixin --account personal
+nanobot channels login weixin --account work --force
 ```
 
 **4. Run**

@@ -3,6 +3,7 @@
 from nanobot.channels._manifest import field, required
 from nanobot.channels.contracts import ChannelManagementSpec, ChannelSetupSpec
 from nanobot.channels.plugin import ChannelPlugin
+from nanobot.channels.weixin.instances import WEIXIN_MANAGEMENT
 from nanobot.channels.weixin.state import local_state_present
 from nanobot.channels.weixin.validation import validate
 
@@ -36,7 +37,14 @@ PLUGIN = ChannelPlugin(
     runtime=f"{__package__}.runtime:WeixinChannel",
     connector=f"{__package__}.connect:WeixinConnectStore",
     setup=SETUP_SPEC,
-    management=ChannelManagementSpec(local_state_present=local_state_present),
+    management=ChannelManagementSpec(
+        multi_instance=True,
+        default_config=WEIXIN_MANAGEMENT.default_config,
+        instance_specs=WEIXIN_MANAGEMENT.instance_specs,
+        update_instance_config=WEIXIN_MANAGEMENT.update_instance_config,
+        runtime_name=WEIXIN_MANAGEMENT.runtime_name,
+        local_state_present=local_state_present,
+    ),
     dependencies=(
         "qrcode[pil]>=8.0",
         "pycryptodome>=3.20.0",

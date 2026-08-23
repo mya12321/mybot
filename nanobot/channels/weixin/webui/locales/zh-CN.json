@@ -39,6 +39,16 @@
     }
   },
   "custom": {
+    "toggleAccount": "{{name}} 账号",
+    "configured": "已连接",
+    "needsSetup": "需要登录",
+    "connectAccount": "连接账号",
+    "installSupport": "安装微信支持",
+    "addAccount": "添加另一个账号",
+    "addAccountHint": "在微信频道设置中添加新的账号 ID，然后在这里连接。",
+    "countNone": "尚未连接微信账号",
+    "countOne": "已连接 1 个微信账号",
+    "countMany": "已连接 {{count}} 个微信账号",
     "qrAlt": "微信登录二维码",
     "scanTitle": "使用微信扫码",
     "scanDescription": "用手机微信扫描此二维码。登录后，nanobot 会将账户状态保存在本地。",

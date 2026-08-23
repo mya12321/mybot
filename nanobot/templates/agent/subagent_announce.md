@@ -1,8 +1,16 @@
-[Subagent '{{ label }}' {{ status_text }}]
+# Subagent Result
 
-Task: {{ task }}
+**Label:** {{ label }}
+**Status:** {{ status_text }}
 
-Result:
+## Task
+
+{{ task }}
+
+## Result
+
 {{ result }}
 
-Summarize this naturally for the user. Keep it brief (1-2 sentences). Do not mention technical details like "subagent" or task IDs.
+---
+
+Summarize naturally for the user in 1-2 sentences. Do not mention "subagent" or task IDs.

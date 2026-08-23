@@ -10,6 +10,7 @@ import json
 import os
 import re
 from collections.abc import Callable
+from random import randint
 from typing import Any, cast
 from urllib.parse import parse_qsl, quote, urljoin, urlparse
 
@@ -628,10 +629,12 @@ class WebSearchTool(Tool):
             logger.warning("TAVILY_API_KEY not set, falling back to DuckDuckGo")
             return await self._search_duckduckgo(query, n)
         try:
+            key_list = [key.strip() for key in api_key.split(",") if key.strip()]
+            key = key_list[randint(0, len(key_list) - 1)]
             async with httpx.AsyncClient(proxy=self.proxy) as client:
                 r = await client.post(
                     "https://api.tavily.com/search",
-                    headers={"Authorization": f"Bearer {api_key}", "User-Agent": self.user_agent},
+                    headers={"Authorization": f"Bearer {key}", "User-Agent": self.user_agent},
                     json={"query": query, "max_results": n},
                     timeout=15.0,
                 )

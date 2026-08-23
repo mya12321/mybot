@@ -99,6 +99,36 @@ def test_save_and_load_state_persists_context_tokens(tmp_path) -> None:
     assert restored._context_tokens == {"wx-user": "ctx-1"}
 
 
+def test_save_and_load_state_is_isolated_by_account_id(tmp_path) -> None:
+    bus = MessageBus()
+    work = WeixinChannel(
+        WeixinConfig(enabled=True, allow_from=["*"], state_dir=str(tmp_path), account_id="work"),
+        bus,
+    )
+    work._token = "token-work"
+    work._context_tokens = {"wx-user": "ctx-work"}
+    work._save_state()
+
+    assert not (tmp_path / "account.json").exists()
+    saved = json.loads((tmp_path / "account_work.json").read_text())
+    assert saved["token"] == "token-work"
+    assert saved["context_tokens"] == {"wx-user": "ctx-work"}
+
+    restored = WeixinChannel(
+        WeixinConfig(enabled=True, allow_from=["*"], state_dir=str(tmp_path), account_id="work"),
+        bus,
+    )
+    assert restored._load_state() is True
+    assert restored._token == "token-work"
+    assert restored._context_tokens == {"wx-user": "ctx-work"}
+
+    default = WeixinChannel(
+        WeixinConfig(enabled=True, allow_from=["*"], state_dir=str(tmp_path)),
+        bus,
+    )
+    assert default._load_state() is False
+
+
 def test_save_state_preserves_token_committed_by_another_instance(tmp_path) -> None:
     channel = WeixinChannel(
         WeixinConfig(enabled=True, allow_from=["*"], state_dir=str(tmp_path)),

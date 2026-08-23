@@ -5,12 +5,34 @@ To add a new backend, implement a function with the signature:
 and register it in _BACKENDS below.
 """
 
+import json
 import os
 import shlex
 from pathlib import Path
 from typing import Iterable
 
 from nanobot.config.paths import get_media_dir
+
+
+def _load_allowed_env_keys(config_path: Path) -> list[str]:
+    """Load tools.exec.allowedEnvKeys from config.json, if available."""
+    try:
+        with config_path.open(encoding="utf-8") as f:
+            data = json.load(f)
+    except (OSError, json.JSONDecodeError):
+        return []
+
+    tools = data.get("tools")
+    if not isinstance(tools, dict):
+        return []
+    exec_cfg = tools.get("exec")
+    if not isinstance(exec_cfg, dict):
+        return []
+
+    raw_keys = exec_cfg.get("allowedEnvKeys", exec_cfg.get("allowed_env_keys"))
+    if not isinstance(raw_keys, list):
+        return []
+    return [k for k in raw_keys if isinstance(k, str) and k]
 
 
 def _normalize_bind_paths(
@@ -61,6 +83,14 @@ def _bwrap(
     """
     ws = Path(workspace).resolve()
     media = get_media_dir().resolve()
+    allowed_env_keys = [
+        "LANG",
+        "NVM_BIN",
+        "NVM_DIR",
+        "NVM_INC",
+        "TERM",
+        *_load_allowed_env_keys(ws.parent / "config.json"),
+    ]
 
     try:
         sandbox_cwd = str(ws / Path(cwd).resolve().relative_to(ws))
@@ -79,19 +109,53 @@ def _bwrap(
         "/etc/crypto-policies",
         "/etc/resolv.conf",
         "/etc/ld.so.cache",
+        "/root/.local",
     ]
+    dependencies = ["/root/.nvm"]
 
-    args = ["bwrap", "--new-session", "--die-with-parent", "--setenv", "HOME", str(ws)]
+    args = [
+        "bwrap",
+        "--new-session",
+        "--die-with-parent",
+        "--share-net",
+        "--clearenv",
+        "--setenv",
+        "HOME",
+        str(ws),
+    ]
     for p in required:
         args += ["--ro-bind", p, p]
     for p in optional:
         args += ["--ro-bind-try", p, p]
+    for p in dependencies:
+        args += ["--bind-try", p, p]
+    for key in allowed_env_keys:
+        value = os.environ.get(key)
+        if value is not None:
+            args += ["--setenv", key, value]
     args += [
-        "--proc", "/proc", "--dev", "/dev", "--tmpfs", "/tmp",
-        "--tmpfs", str(ws.parent),        # mask config dir
-        "--dir", str(ws),                 # recreate workspace mount point
-        "--bind", str(ws), str(ws),
-        "--ro-bind-try", str(media), str(media),  # read-only access to media
+        "--setenv",
+        "VIRTUAL_ENV",
+        str(ws / ".venv"),
+        "--setenv",
+        "PATH",
+        f"{str(ws / '.venv' / 'bin')}:{os.environ.get('PATH', '')}",
+        "--proc",
+        "/proc",
+        "--dev",
+        "/dev",
+        "--tmpfs",
+        "/tmp",
+        "--tmpfs",
+        str(ws.parent),
+        "--dir",
+        str(ws),
+        "--bind",
+        str(ws),
+        str(ws),
+        "--ro-bind-try",
+        str(media),
+        str(media),
     ]
     for p in _normalize_bind_paths(sandbox_ro_binds, workspace=ws):
         args += ["--ro-bind-try", p, p]

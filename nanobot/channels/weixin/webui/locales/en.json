@@ -38,6 +38,16 @@
     }
   },
   "custom": {
+    "toggleAccount": "{{name}} account",
+    "configured": "Connected",
+    "needsSetup": "Needs login",
+    "connectAccount": "Connect account",
+    "installSupport": "Install WeChat support",
+    "addAccount": "Add another account",
+    "addAccountHint": "Add a new account ID in the WeChat channel settings, then connect it here.",
+    "countNone": "No WeChat account connected",
+    "countOne": "1 WeChat account connected",
+    "countMany": "{{count}} WeChat accounts connected",
     "qrAlt": "WeChat login QR code",
     "scanTitle": "Scan with WeChat",
     "scanDescription": "Use WeChat on your phone to scan this code. nanobot saves the account state locally after login.",

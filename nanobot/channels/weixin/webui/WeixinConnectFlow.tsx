@@ -12,7 +12,10 @@ import {
 } from "@/components/settings/channels/ChannelQrConnectFlow";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import type { ChannelConnectPayload } from "@/lib/types";
+import type {
+  ChannelConnectPayload,
+  ChannelRuntimeStatus,
+} from "@/lib/types";
 
 type WeixinVerificationPayload = ChannelConnectPayload & {
   challenge: "verify_code";
@@ -69,14 +72,21 @@ function weixinConnectMessage(
 export function WeixinConnectFlow({
   token,
   feature,
+  instanceId = "default",
+  runtimeError,
+  runtimeStatus,
   idleLabel,
   connectRequestId,
   onFeaturesUpdate,
-}: ChannelPluginConnectFlowProps) {
+}: ChannelPluginConnectFlowProps & {
+  instanceId?: string;
+  runtimeError?: string;
+  runtimeStatus?: ChannelRuntimeStatus;
+}) {
   const { t } = useTranslation();
   const tx = channelTranslator(t, "weixin");
   const [verificationCode, setVerificationCode] = useState("");
-  const authExpired = feature.runtime_error === WEIXIN_AUTH_EXPIRED_MESSAGE;
+  const authExpired = (runtimeError ?? feature.runtime_error) === WEIXIN_AUTH_EXPIRED_MESSAGE;
   const scanAgainLabel = t("settings.channels.scanAgain", {
     defaultValue: "Scan again",
   });
@@ -134,13 +144,13 @@ export function WeixinConnectFlow({
     <ChannelQrConnectFlow
       token={token}
       channelName="weixin"
-      startOptions={{ force: authExpired }}
+      startOptions={{ force: authExpired, instanceId }}
       idleLabel={authExpired ? scanAgainLabel : idleLabel}
       connectRequestId={connectRequestId}
       forceOnRepeat
       onFeaturesUpdate={onFeaturesUpdate}
       pausePolling={isVerificationChallenge}
-      suppressSucceeded={feature.runtime_status === "failed"}
+      suppressSucceeded={(runtimeStatus ?? feature.runtime_status) === "failed"}
       renderPending={renderVerification}
       resolveMessage={(payload) => weixinConnectMessage(payload, tx)}
       labels={{

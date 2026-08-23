@@ -38,6 +38,16 @@
     }
   },
   "custom": {
+    "toggleAccount": "{{name}} アカウント",
+    "configured": "接続済み",
+    "needsSetup": "ログインが必要",
+    "connectAccount": "アカウントを接続",
+    "installSupport": "微信サポートをインストール",
+    "addAccount": "別のアカウントを追加",
+    "addAccountHint": "微信のチャンネル設定で新しいアカウント ID を追加してから接続してください。",
+    "countNone": "接続済みの微信アカウントはありません",
+    "countOne": "1 つの微信アカウントを接続中",
+    "countMany": "{{count}} 件の微信アカウントを接続中",
     "qrAlt": "WeChat ログイン QR コード",
     "scanTitle": "WeChat でスキャン",
     "scanDescription": "スマートフォンの WeChat でスキャンしてください。ログイン後、nanobot が状態をローカルに保存します。",

@@ -3487,6 +3487,35 @@ async def test_enabled_channels_returns_channel_names():
     assert len(enabled) == 2
 
 
+def test_expand_weixin_channel_instances_from_accounts_config():
+    from nanobot.channels.weixin.instances import (
+        managed_weixin_instance_specs,
+        runtime_channel_name,
+    )
+
+    section = {
+        "enabled": True,
+        "allowFrom": ["*"],
+        "accounts": [
+            {"id": "personal"},
+            {"accountId": "work", "routeTag": "rt-work"},
+        ],
+    }
+
+    specs = managed_weixin_instance_specs(section, enabled_only=False)
+    expanded = [
+        (runtime_channel_name("weixin", spec.instance_id), spec.config)
+        for spec in specs
+    ]
+
+    assert len(expanded) == 2
+    names = [name for name, _cfg in expanded]
+    assert names == ["weixin.personal", "weixin.work"]
+    assert expanded[0][1]["account_id"] == "personal"
+    assert expanded[1][1]["account_id"] == "work"
+    assert expanded[1][1]["routeTag"] == "rt-work"
+
+
 @pytest.mark.asyncio
 async def test_stop_all_cancels_dispatcher_and_stops_channels():
     """stop_all should cancel the dispatch task and stop all channels."""

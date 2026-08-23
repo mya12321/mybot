@@ -39,6 +39,16 @@
     }
   },
   "custom": {
+    "toggleAccount": "{{name}} 帳戶",
+    "configured": "已連接",
+    "needsSetup": "需要登入",
+    "connectAccount": "連接帳戶",
+    "installSupport": "安裝微信支援",
+    "addAccount": "新增另一個帳戶",
+    "addAccountHint": "在微信頻道設定中新增帳戶 ID，然後在這裡連接。",
+    "countNone": "尚未連接微信帳戶",
+    "countOne": "已連接 1 個微信帳戶",
+    "countMany": "已連接 {{count}} 個微信帳戶",
     "qrAlt": "微信登入二維碼",
     "scanTitle": "使用微信掃碼",
     "scanDescription": "用手機微信掃描此二維碼。登入後，nanobot 會將帳戶狀態儲存在本機。",

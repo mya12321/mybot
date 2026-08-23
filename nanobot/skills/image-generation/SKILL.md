@@ -1,66 +1,94 @@
 ---
 name: image-generation
-description: Generate images and iteratively edit saved image artifacts.
+description: Generate images using StepFun's step-2x-large model. Use when users ask to generate images, create pictures from text descriptions, or modify existing images. Supports both text-to-image and image-to-image generation.
+homepage: https://platform.stepfun.com/docs/zh/api-reference/images/image
+metadata: {"nanobot":{"emoji":"🎨","requires":{"bins":["python3"],"env":["STEPFUN_API_KEY"]},"install":[{"id":"pip","kind":"pip","packages":["requests"],"label":"Install requests library"}]}}
 ---
 
 # Image Generation
 
-Use the `generate_image` tool when the user asks you to create, render, draw, design, generate, or edit an image.
+使用阶跃星辰（StepFun）的 step-2x-large 模型生成图片。支持文生图和图生图两种模式。
 
-If the `generate_image` tool is not available in the current tool list, tell the user that image generation is not enabled for this nanobot instance.
+## 环境变量
 
-## When To Use
+| 变量 | 用途 | 必需 |
+|---|---|---|
+| `STEPFUN_API_KEY` | 阶跃星辰 API Key | 是 |
 
-- Text-to-image: call `generate_image` with a concrete `prompt`.
-- Image editing: pass the saved artifact path or user image path in `reference_images`.
-- Iterative edits in the same conversation: prefer the most recent generated image artifact if the user says things like "make it brighter", "change the background", or "try another version".
-- Ambiguous edits: ask a short clarifying question if multiple recent images could be the target.
-- After generating images, call the `message` tool with the artifact paths in the `media` parameter to deliver them to the user.
+## 工作流程
 
-## Prompt Rules
+1. **优化Prompt**：根据用户的简单描述，生成一份详细的英文生图Prompt
+2. **保存Prompt**：使用 WriteFileTool 将优化后的Prompt写入md文件
+3. **生成图片**：调用Python脚本使用阶跃星辰API生成图片
 
-Write prompts with enough detail for image models:
+# Prompt优化指南
 
-- Subject and scene.
-- Composition and camera or layout.
-- Style, mood, lighting, and color palette.
-- Text that must appear in the image, quoted exactly.
-- Constraints such as "keep the same character", "preserve the logo", or "do not change the background".
+当用户提供简单的图片描述时，应该将其扩展为详细的英文Prompt, 需注意prompt最多为1024个字符：
 
-## Artifact Rules
+## 示例
 
-The tool stores generated images as persistent artifacts under nanobot's media directory and returns structured metadata:
+**用户输入**: "一只可爱的猫咪"
 
-- `id`: generated image id, such as `img_ab12cd34ef56`.
-- `path`: local file path for internal follow-up edits.
-- `mime`: image MIME type.
-- `prompt`, `model`, and `source_images`: provenance for follow-up edits.
-
-In normal user-facing replies, do not expose local filesystem paths. Keep the reply natural, for example "Done, I generated it." You may include the short image `id` when it helps the user refer to a specific image, but keep raw `path` internal unless the user explicitly asks for debug details or a local artifact reference. Never paste base64.
-
-For follow-up edits, pass the prior artifact `path` to `reference_images`. If the user provides a new uploaded image, use that path as the reference instead.
-
-Do not include internal replay markers such as `[Message Time: ...]`, `[image: /local/path]`, `generate_image(...)`, or `message(...)` in user-facing replies.
-
-## Examples
-
-Generate a new image:
-
-```text
-generate_image(
-  prompt="A minimal app icon for nanobot: friendly robot head, rounded square, soft blue and white palette, clean vector style, no text",
-  aspect_ratio="1:1",
-  image_size="1K"
-)
+**优化后的Prompt**:
+```
+A cute fluffy kitten with big round eyes, sitting on a soft cushion, warm sunlight streaming through a window, cozy indoor setting, highly detailed fur texture, photorealistic style, 8k quality, soft bokeh background
 ```
 
-Edit the latest generated artifact:
+**用户输入**: "未来城市"
 
-```text
-generate_image(
-  prompt="Use the reference image. Keep the same robot and composition, but change the palette to warm orange and add a subtle sunrise background.",
-  reference_images=["/home/user/.nanobot/media/generated/2026-05-08/img_ab12cd34ef56.png"],
-  aspect_ratio="1:1",
-  image_size="1K"
-)
+**优化后的Prompt**:
 ```
+A futuristic cyberpunk cityscape at night, towering neon-lit skyscrapers, flying vehicles between buildings, holographic advertisements, rain-slicked streets reflecting colorful lights, dystopian atmosphere, cinematic composition, highly detailed, 8k resolution, digital art style
+```
+
+## Prompt要素
+
+一个好的生图Prompt应包含：
+1. **主体** - 主要对象或场景
+2. **环境** - 背景、场景设置
+3. **风格** - 艺术风格（写实、动漫、油画等）
+4. **光线** - 光照条件
+5. **质量** - 画质描述（highly detailed, 8k, masterpiece等）
+6. **氛围** - 情感、色调
+
+# 调用脚本生成图片
+
+## 文生图脚本调用
+
+```bash
+python3 skills/image-generation/scripts/image_generation.py --model "step-2x-large" --promptFile "prompt.md" --outputFile "garden_puppy.png" --size "800x1280"
+```
+
+## 图生图脚本调用
+
+```bash
+python3 skills/image-generation/scripts/image_generation.py --model "step-2x-large" --promptFile "prompt.md" --outputFile "garden_puppy.png" --sourceFile "source.png" --size "1024x1024"
+```
+
+## 脚本参数说明
+
+| 参数 | 类型 | 必需 | 说明 |
+|---|---|---|---|
+| `model` | string | 是 | 模型名称，当前固定为 `step-2x-large` |
+| `promptFile` | string | 是 | 图片描述文件路径, 格式为Markdown |
+| `outputFile` | string | 是 | 生成图片的文件路径, 必须是.png文件 |
+| `sourceFile` | string | 否 | 图生图的源图文件路径 |
+| `size` | string | 否 | 图片尺寸，默认1024x1024 |
+
+## 图片支持的尺寸
+- `256x256, 512x512, 768x768, 1024x1024` - 正方形, 默认为1024x1024
+- `800x1280` - 竖屏
+- `1280x800` - 横屏
+
+## 错误处理
+
+常见错误码：
+- `400` - 请求参数错误
+- `401` - API Key无效
+- `429` - 请求过于频繁
+- `500` - 服务器内部错误
+
+# 注意事项
+
+1. Prompt建议使用英文，可以获得更好的生成效果
+2. 生成图片可能受内容政策限制

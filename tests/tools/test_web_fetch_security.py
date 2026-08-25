@@ -54,6 +54,9 @@ def _patch_web_fetch_fake_client(monkeypatch: pytest.MonkeyPatch) -> list[dict]:
 
     class FakeJinaResponse:
         status_code = 200
+        url = "https://example.com/page"
+        headers = {"content-type": "text/html"}
+        text = "<html><head><title>Example</title></head><body><p>Hello</p></body></html>"
 
         def raise_for_status(self):
             return None
@@ -131,6 +134,11 @@ async def test_web_fetch_result_contains_untrusted_flag(monkeypatch: pytest.Monk
     tool = WebFetchTool()
     _patch_web_fetch_fake_client(monkeypatch)
 
+    async def _extract(url, mode):
+        return "Hello world"
+
+    monkeypatch.setattr(tool, "_extract_readable_html", _extract)
+
     with patch("nanobot.security.network.socket.getaddrinfo", _fake_resolve_public):
         result = await tool.execute(url="https://example.com/page")
 
@@ -189,7 +197,10 @@ async def test_safe_redirect_requests_use_independent_pinned_dns_concurrently(mo
 
 @pytest.mark.asyncio
 async def test_web_fetch_proxy_remains_supported(monkeypatch):
-    tool = WebFetchTool(proxy="http://config-proxy.example:7890")
+    tool = WebFetchTool(
+        config=WebFetchConfig(use_jina_reader=True),
+        proxy="http://config-proxy.example:7890",
+    )
     client_kwargs = _patch_web_fetch_fake_client(monkeypatch)
 
     monkeypatch.setenv("HTTPS_PROXY", "http://env-proxy.example:8080")
@@ -207,7 +218,7 @@ async def test_web_fetch_proxy_remains_supported(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_web_fetch_env_proxy_adds_proxy_mounts_and_keeps_pinned_transport(monkeypatch):
-    tool = WebFetchTool()
+    tool = WebFetchTool(config=WebFetchConfig(use_jina_reader=True))
     client_kwargs = _patch_web_fetch_fake_client(monkeypatch)
 
     monkeypatch.setenv("HTTPS_PROXY", "http://proxy.example:8080")
@@ -333,7 +344,11 @@ async def test_web_fetch_can_skip_jina_and_use_custom_user_agent(monkeypatch):
             return FakeResponse()
 
     monkeypatch.setattr(tool, "_fetch_jina", _fail_jina)
-    monkeypatch.setattr(tool, "_extract_readable_html", lambda html, mode: "Hello world")
+
+    async def _extract(url, mode):
+        return "Hello world"
+
+    monkeypatch.setattr(tool, "_extract_readable_html", _extract)
     monkeypatch.setattr("nanobot.agent.tools.web.httpx.AsyncClient", FakeClient)
     monkeypatch.setattr(web_module, "_pinned_dns_transport", lambda: object())
 
@@ -341,7 +356,7 @@ async def test_web_fetch_can_skip_jina_and_use_custom_user_agent(monkeypatch):
         result = await tool.execute(url="https://example.com/page")
 
     data = json.loads(result)
-    assert data["extractor"] == "readability"
+    assert data["extractor"] == "trafilatura"
     assert [headers["User-Agent"] for headers in seen_headers] == [
         "nanobot-test-agent",
         "nanobot-test-agent",
@@ -349,7 +364,7 @@ async def test_web_fetch_can_skip_jina_and_use_custom_user_agent(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_web_fetch_falls_back_when_readability_dependency_is_missing(monkeypatch):
+async def test_web_fetch_falls_back_when_extractor_dependency_is_missing(monkeypatch):
     tool = WebFetchTool(config=WebFetchConfig(use_jina_reader=False))
 
     class FakeResponse:
@@ -374,10 +389,10 @@ async def test_web_fetch_falls_back_when_readability_dependency_is_missing(monke
         async def get(self, url, headers=None, follow_redirects=False, **kwargs):
             return FakeResponse()
 
-    def _missing_readability(*args, **kwargs):
-        raise ModuleNotFoundError("No module named 'lxml_html_clean'")
+    async def _missing_extractor(*args, **kwargs):
+        raise ModuleNotFoundError("No module named 'scrapling'")
 
-    monkeypatch.setattr(tool, "_extract_readable_html", _missing_readability)
+    monkeypatch.setattr(tool, "_extract_readable_html", _missing_extractor)
     monkeypatch.setattr("nanobot.agent.tools.web.httpx.AsyncClient", FakeClient)
     monkeypatch.setattr(web_module, "_pinned_dns_transport", lambda: object())
 

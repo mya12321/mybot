@@ -26,7 +26,7 @@ def test_capability_domain_updates_representative_settings() -> None:
         {
             "provider": ["duckduckgo"],
             "max_results": ["7"],
-            "use_jina_reader": ["false"],
+            "use_jina_reader": ["true"],
         },
     )
     update_api_settings(

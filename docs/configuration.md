@@ -1937,7 +1937,7 @@ If you want to always use the local conversion, you can force it using:
 
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
-| `useJinaReader` | boolean | `true` | If true, Jina Reader will be preferred over the local conversion |
+| `useJinaReader` | boolean | `false` | If true, Jina Reader is preferred over the local scrapling + trafilatura conversion |
 
 ## Image Generation
 

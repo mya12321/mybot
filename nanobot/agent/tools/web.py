@@ -70,7 +70,9 @@ class WebSearchConfig(Base):
 
 class WebFetchConfig(Base):
     """Web fetch tool configuration."""
-    use_jina_reader: bool = True
+    # Jina Reader forwards URLs to a third party and can fail on JS-heavy pages.
+    # Local scrapling + trafilatura is the default; Jina remains opt-in.
+    use_jina_reader: bool = False
 
 
 class WebToolsConfig(Base):
@@ -630,6 +632,9 @@ class WebSearchTool(Tool):
             return await self._search_duckduckgo(query, n)
         try:
             key_list = [key.strip() for key in api_key.split(",") if key.strip()]
+            if not key_list:
+                logger.warning("No usable Tavily key found, falling back to DuckDuckGo")
+                return await self._search_duckduckgo(query, n)
             key = key_list[randint(0, len(key_list) - 1)]
             async with httpx.AsyncClient(proxy=self.proxy) as client:
                 r = await client.post(
@@ -1053,7 +1058,7 @@ class WebSearchTool(Tool):
         url=StringSchema("URL to fetch"),
         extractMode={
             "type": "string",
-            "enum": ["markdown", "text"],
+            "enum": ["markdown", "txt"],
             "default": "markdown",
         },
         maxChars=IntegerSchema(minimum=100),
@@ -1066,7 +1071,7 @@ class WebFetchTool(Tool):
 
     name = "web_fetch"  # pyright: ignore[reportIncompatibleMethodOverride, reportAssignmentType]
     description = (  # pyright: ignore[reportIncompatibleMethodOverride, reportAssignmentType]
-        "Fetch a URL and extract readable content (HTML → markdown/text). "
+        "Fetch a URL and extract readable content (HTML → markdown/txt). "
         "Output is capped at maxChars (default 50 000). "
         "Works for most web pages and docs; may fail on login-walled or JS-heavy sites."
     )
@@ -1180,7 +1185,7 @@ class WebFetchTool(Tool):
             async with httpx.AsyncClient(proxy=self.proxy, timeout=20.0) as client:
                 r = await client.get(f"https://r.jina.ai/{forwarded_url}", headers=headers)
                 if r.status_code == 429:
-                    logger.debug("Jina Reader rate limited, falling back to readability")
+                    logger.debug("Jina Reader rate limited, falling back to the local extractor")
                     return None
                 r.raise_for_status()
 
@@ -1204,14 +1209,14 @@ class WebFetchTool(Tool):
             }, ensure_ascii=False)
         except Exception as e:
             logger.debug(
-                "Jina Reader failed for {}, falling back to readability ({})",
+                "Jina Reader failed for {}, falling back to the local extractor ({})",
                 _redact_url_for_log(url),
                 type(e).__name__,
             )
             return None
 
     async def _fetch_readability(self, url: str, extract_mode: str, max_chars: int) -> Any:
-        """Local fallback using readability-lxml."""
+        """Local fallback: render with a headless browser and extract with trafilatura."""
         try:
             async with httpx.AsyncClient(
                 **_fetch_client_kwargs(self.proxy, 30.0),
@@ -1235,11 +1240,18 @@ class WebFetchTool(Tool):
                 text, extractor = json.dumps(r.json(), indent=2, ensure_ascii=False), "json"
             elif "text/html" in ctype or r.text[:256].lower().startswith(("<!doctype", "<html")):
                 try:
-                    text = self._extract_readable_html(r.text, extract_mode)
-                    extractor = "readability"
+                    text = await self._extract_readable_html(str(r.url), extract_mode)
+                    extractor = "trafilatura"
+                except (ImportError, ModuleNotFoundError) as e:
+                    logger.warning(
+                        "Local extractor unavailable for {} ({}), using raw HTML fallback",
+                        _redact_url_for_log(url),
+                        type(e).__name__,
+                    )
+                    text, extractor = _normalize(_strip_tags(r.text)), "html"
                 except Exception as e:
                     logger.warning(
-                        "Readability failed for {}, using raw HTML fallback ({})",
+                        "Readable extraction failed for {} ({}), using raw HTML fallback",
                         _redact_url_for_log(url),
                         type(e).__name__,
                     )
@@ -1272,21 +1284,46 @@ class WebFetchTool(Tool):
             )
             return json.dumps({"error": str(e), "url": url}, ensure_ascii=False)
 
-    def _extract_readable_html(self, html_content: str, extract_mode: str) -> str:
-        from readability import Document  # pyright: ignore[reportMissingTypeStubs]
+    async def _extract_readable_html(self, url: str, extract_mode: str, timeout: float = 10.0) -> str:
+        """Render the URL in a stealth headless browser, then extract readable text.
 
-        doc = Document(html_content)
-        summary = cast(str, doc.summary())
-        content = self._to_markdown(summary) if extract_mode == "markdown" else _strip_tags(summary)
-        return f"# {doc.title()}\n\n{content}" if doc.title() else content
+        scrapling and trafilatura are imported lazily so a missing dependency raises
+        here and the caller can fall back to raw-HTML extraction.
+        """
+        import trafilatura  # pyright: ignore[reportMissingImports, reportMissingTypeStubs]
+        from scrapling.fetchers import (
+            AsyncStealthySession,  # pyright: ignore[reportMissingImports, reportMissingTypeStubs, reportUnknownVariableType]
+        )
 
-    def _to_markdown(self, html_content: str) -> str:
-        """Convert HTML to markdown."""
-        text = re.sub(r'<a\s+[^>]*href=["\']([^"\']+)["\'][^>]*>([\s\S]*?)</a>',
-                      lambda m: f'[{_strip_tags(m[2])}]({m[1]})', html_content, flags=re.I)
-        text = re.sub(r'<h([1-6])[^>]*>([\s\S]*?)</h\1>',
-                      lambda m: f'\n{"#" * int(m[1])} {_strip_tags(m[2])}\n', text, flags=re.I)
-        text = re.sub(r'<li[^>]*>([\s\S]*?)</li>', lambda m: f'\n- {_strip_tags(m[1])}', text, flags=re.I)
-        text = re.sub(r'</(p|div|section|article)>', '\n\n', text, flags=re.I)
-        text = re.sub(r'<(br|hr)\s*/?>', '\n', text, flags=re.I)
-        return _normalize(_strip_tags(text))
+        session_type = cast(Any, AsyncStealthySession)
+        async with session_type(
+            headless=True,
+            block_webrtc=True,
+            hide_canvas=True,
+            disable_resources=True,
+        ) as session:
+            page = await session.context.new_page()
+            await page.goto(
+                url,
+                wait_until="domcontentloaded",
+                referer="https://www.google.com/search?q=test",
+            )
+            _, pending = await asyncio.wait(
+                [
+                    asyncio.create_task(page.wait_for_load_state("networkidle")),
+                    asyncio.create_task(asyncio.sleep(timeout)),
+                ],
+                return_when=asyncio.FIRST_COMPLETED,
+            )
+            rendered_html = await page.content()
+            for task in pending:
+                task.cancel()
+
+        output_format = "markdown" if extract_mode == "markdown" else "txt"
+        text = trafilatura.extract(
+            rendered_html,
+            output_format=output_format,
+            include_links=False,
+            include_tables=True,
+        )
+        return text or ""

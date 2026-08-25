@@ -132,6 +132,27 @@ async def test_tavily_search(monkeypatch):
     assert "https://openclaw.io" in result
 
 
+@pytest.mark.asyncio
+async def test_tavily_search_supports_multiple_keys(monkeypatch):
+    """A comma-separated Tavily key list is used one key per request."""
+    seen_keys: set[str] = set()
+
+    async def mock_post(self, url, **kw):
+        seen_keys.add(kw["headers"]["Authorization"])
+        return _response(json={
+            "results": [{"title": "OpenClaw", "url": "https://openclaw.io", "content": "Framework"}]
+        })
+
+    monkeypatch.setattr(httpx.AsyncClient, "post", mock_post)
+    tool = _tool(provider="tavily", api_key="key-one, key-two")
+    result = await tool.execute(query="openclaw")
+
+    assert "OpenClaw" in result
+    # Exactly one of the configured keys must be used per request.
+    assert len(seen_keys) == 1
+    assert seen_keys <= {"Bearer key-one", "Bearer key-two"}
+
+
 def test_keenable_without_api_key_is_concurrency_safe(monkeypatch):
     monkeypatch.delenv("KEENABLE_API_KEY", raising=False)
     tool = _tool(provider="keenable", api_key="")

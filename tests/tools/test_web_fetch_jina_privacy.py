@@ -202,7 +202,10 @@ async def test_execute_fetches_credential_urls_locally(monkeypatch) -> None:
             requested.append(str(url))
             return FakeResponse()
 
-    monkeypatch.setattr(tool, "_extract_readable_html", lambda html, mode: "ok")
+    async def _extract(url, mode):
+        return "ok"
+
+    monkeypatch.setattr(tool, "_extract_readable_html", _extract)
     monkeypatch.setattr("nanobot.agent.tools.web.httpx.AsyncClient", FakeClient)
     monkeypatch.setattr(web_module, "_pinned_dns_transport", lambda: object())
 
@@ -210,7 +213,7 @@ async def test_execute_fetches_credential_urls_locally(monkeypatch) -> None:
         result = await tool.execute(url="https://example.com/download?token=abc123")
 
     data = json.loads(result)
-    assert data["extractor"] == "readability"
+    assert data["extractor"] == "trafilatura"
     assert all("r.jina.ai" not in url for url in requested)
 
 
@@ -266,7 +269,10 @@ async def test_execute_does_not_send_redirected_credential_url_to_jina(monkeypat
             requested.append(str(url))
             return FakeResponse()
 
-    monkeypatch.setattr(tool, "_extract_readable_html", lambda html, mode: "ok")
+    async def _extract(url, mode):
+        return "ok"
+
+    monkeypatch.setattr(tool, "_extract_readable_html", _extract)
     monkeypatch.setattr("nanobot.agent.tools.web.httpx.AsyncClient", FakeClient)
     monkeypatch.setattr(web_module, "_pinned_dns_transport", lambda: object())
 
@@ -274,6 +280,6 @@ async def test_execute_does_not_send_redirected_credential_url_to_jina(monkeypat
         result = await tool.execute(url=short_url)
 
     data = json.loads(result)
-    assert data["extractor"] == "readability"
+    assert data["extractor"] == "trafilatura"
     assert signed_url in requested
     assert all("r.jina.ai" not in url for url in requested)

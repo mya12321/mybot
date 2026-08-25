@@ -74,17 +74,18 @@ in the WebUI or logs.
 - Keep API keys in environment variables.
 - Set `maxResults` when you need fewer or more search results per query.
 - Set `tools.web.proxy` only to a proxy you trust.
-- Use `fetch.useJinaReader: false` if you need local page conversion.
+- Local page conversion (scrapling + trafilatura) is the default; set
+  `fetch.useJinaReader: true` only if you prefer the remote Jina Reader.
 
 ## Security notes
 
 - Web fetch and HTTP MCP share an SSRF guard.
 - Private, loopback, link-local, and cloud metadata addresses are blocked by
   default.
-- With `useJinaReader` enabled (the default), fetched URLs are disclosed to the
-  remote reader service. Credential-bearing URLs (userinfo or token/signature
-  query parameters) are fetched locally instead; path-embedded secrets cannot
-  be detected, so disable the remote reader when URLs must stay local.
+- With `useJinaReader` enabled, fetched URLs are disclosed to the remote reader
+  service. Credential-bearing URLs (userinfo or token/signature query parameters)
+  are always fetched locally instead; path-embedded secrets cannot be detected,
+  so keep the remote reader off (the default) when URLs must stay local.
 - Add `tools.ssrfWhitelist` only for narrow trusted CIDRs.
 - Do not give public chat users unrestricted web and shell access without
   review.

@@ -27,7 +27,7 @@ export const DEFAULT_WEB_SEARCH_FORM: WebSearchSettingsUpdate = {
   baseUrl: "",
   maxResults: 5,
   timeout: 30,
-  useJinaReader: true,
+  useJinaReader: false,
 };
 
 export function webSearchFormFromPayload(
